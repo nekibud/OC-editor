@@ -1,4 +1,5 @@
 'use client'
+import { getActiveWorldId, getLegacyWorldId } from '@/lib/world-scope'
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -21,17 +22,16 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
+import { isCountryMembershipEdge } from '@/features/countries/colors'
+import { graphNodeIsVisible } from '../category-visibility'
+import { RelationEditDialog } from './RelationEditDialog'
 import { useGraphData } from '../hooks/useGraphData'
 import { useNavigation } from '@/components/layout/NavigationContext'
 import { createRelation, deleteRelation, updateRelationLabel, updateRelationStyle } from '../services'
 import { useRelationUiStore } from '../store'
-import {
-  RELATION_COLORS,
-  RELATION_ARROW_OPTIONS,
-  resolveRelationColor,
-  resolveRelationArrow,
-} from '../style'
-import { exportRelationGraphPng } from '../exportGraph'
+
+import { exportRelationGraph, type ExportRelationGraphOptions } from '../exportGraph'
+import { RelationExportDialog } from './RelationExportDialog'
 import { useSettings } from '@/lib/settings'
 import { CharacterNode } from './CharacterNode'
 import { EventNode } from './EventNode'
@@ -52,7 +52,7 @@ import { createCountry, deleteCountry, updateCountry } from '@/features/countrie
 import { createEvent, deleteEvent, updateEvent } from '@/features/events/services'
 import { MobileRelationControls, DesktopRelationPanel } from './MobileRelationControls'
 
-const NODE_POSITIONS_KEY = 'oc-relation-node-positions'
+import { loadNodePositions, saveNodePositions } from '../layout-storage'
 const SCOPED_EDGES_KEY = 'oc-relation-scoped-edges'
 
 interface LocalScopedEdge {
@@ -73,27 +73,6 @@ function loadScopedEdges(scope: string): LocalScopedEdge[] {
 
 function saveScopedEdges(scope: string, edges: LocalScopedEdge[]): void {
   localStorage.setItem(`${SCOPED_EDGES_KEY}:${scope}`, JSON.stringify(edges))
-}
-
-function loadNodePositions(scope: string): Record<string, { x: number; y: number }> {
-  try {
-    const raw = localStorage.getItem(`${NODE_POSITIONS_KEY}:${scope}`)
-    if (raw) return JSON.parse(raw)
-    if (scope === 'main') {
-      const legacy = localStorage.getItem(NODE_POSITIONS_KEY)
-      return legacy ? JSON.parse(legacy) : {}
-    }
-    return {}
-  } catch { return {} }
-}
-
-function saveNodePositions(
-  scope: string,
-  positions: Record<string, { x: number; y: number }>,
-) {
-  try {
-    localStorage.setItem(`${NODE_POSITIONS_KEY}:${scope}`, JSON.stringify(positions))
-  } catch { /* quota exceeded, ignore */ }
 }
 
 const LAYOUT_CELL_WIDTH = 200
@@ -226,14 +205,15 @@ export function RelationGraph({
   const [focusedCategory, setFocusedCategory] = useState<'character' | 'event' | 'country' | null>(null)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null)
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const [layoutVersion, setLayoutVersion] = useState(0)
   const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const layoutCacheRef = useRef<{
     scope: string
     positions: Record<string, { x: number; y: number }>
   }>({ scope: '', positions: {} })
-  const [hiddenSectionIds, setHiddenSectionIds] = useState<Set<string>>(new Set())
+  const [enabledSectionIds, setEnabledSectionIds] = useState<Set<string>>(() => new Set())
+  const hiddenSectionIds = useMemo(() => new Set(customSections.filter(section => !enabledSectionIds.has(section.id)).map(section => section.id)), [customSections, enabledSectionIds])
   const visibilitySnapshotRef = useRef<{
     positions: Record<string, { x: number; y: number }>
     viewport: { x: number; y: number; zoom: number } | null
@@ -253,16 +233,13 @@ export function RelationGraph({
   const [edgeEditor, setEdgeEditor] = useState<{
     id: string
     label: string
-    save: (label: string) => void
+    save: (label: string) => void | Promise<void>
   } | null>(null)
-  const [edgeEditorValue, setEdgeEditorValue] = useState('')
-  const edgeEditorInputRef = useRef<HTMLInputElement | null>(null)
   const prevVisible = useRef(false)
   const positionScopeRef = useRef('main')
 
   const openEdgeEditor = useCallback(
-    (id: string, label: string, save: (label: string) => void) => {
-      setEdgeEditorValue(label)
+    (id: string, label: string, save: (label: string) => void | Promise<void>) => {
       setEdgeEditor({ id, label, save })
     },
     [],
@@ -313,7 +290,7 @@ export function RelationGraph({
           customKind: 'section',
           customSectionId: section.id,
           accentColor: section.accentColor,
-          onOpen: section.entries.length > 0 ? () => setFocusedSectionId(section.id) : undefined,
+          onOpen: section.preset || section.entries.length > 0 ? () => setFocusedSectionId(section.id) : undefined,
           subtitle: section.description || `${section.entries.length} 个${section.name}`,
         },
       })
@@ -517,6 +494,9 @@ export function RelationGraph({
         ? `node:${focusedNodeId}`
         : 'main'
 
+  const worldId = getActiveWorldId()
+  const positionScope = worldId !== null && worldId !== getLegacyWorldId() ? `world:${worldId}:${graphScope}` : graphScope
+
   // Older builds could create graph-only edges in localStorage. Promote them
   // once to real relations so they can never diverge from entity panels again.
   useEffect(() => {
@@ -568,9 +548,9 @@ export function RelationGraph({
           data: {
             ...edge.data,
             onEditLabel: (id: string, label: string) =>
-              openEdgeEditor(id, label, (next) => void updateRelationLabel(id, next)),
+              openEdgeEditor(id, label, (next) => updateRelationLabel(id, next)),
             onDelete: (id: string) => setPendingDeleteEdgeId(id),
-            onStyle: (id: string) => setSelectedEdgeId(id),
+            onStyle: (id: string) => openEdgeEditor(id, String(edge.data?.relation ?? '相关'), (next) => updateRelationLabel(id, next)),
           },
         }))
       : rawEdges.map((edge) => ({
@@ -582,10 +562,12 @@ export function RelationGraph({
             relationId: String(edge.id),
             color: edge.data?.color,
             arrow: edge.data?.arrow,
+            onEditLabel: (id: string, label: string) =>
+              openEdgeEditor(id, label, (next) => updateRelationLabel(id, next)),
             onLabelChange: (_id: string, label: string) =>
               void updateRelationLabel(String(edge.id), label),
             onDelete: (id: string) => setPendingDeleteEdgeId(id),
-            onStyle: (id: string) => setSelectedEdgeId(id),
+            onStyle: (id: string) => openEdgeEditor(id, String(edge.data?.relation ?? '相关'), (next) => updateRelationLabel(id, next)),
           },
         }))
     const isHubId = (id: string): boolean =>
@@ -658,7 +640,12 @@ export function RelationGraph({
       group.push(String(edge.id))
       groups.set(key, group)
     }
-    return uniqueEdges.map((edge) => {
+    return uniqueEdges.map((original) => {
+      const onLabelChange = original.data?.onLabelChange as ((id: string, label: string) => void) | undefined
+      const edge = onLabelChange && !original.data?.onEditLabel ? {
+        ...original, data: { ...original.data, onEditLabel: (id: string, label: string) =>
+          openEdgeEditor(id, label, (next) => onLabelChange(id, next)) },
+      } : original
       const key = [String(edge.source), String(edge.target)].sort().join('::')
       const group = groups.get(key) ?? [String(edge.id)]
       const index = group.indexOf(String(edge.id))
@@ -706,8 +693,9 @@ export function RelationGraph({
     if (focusedSectionId) {
       for (const node of allNodes) {
         if (
-          node.data?.customSectionId === focusedSectionId &&
-          node.data?.customKind === 'entry'
+          (node.data?.customSectionId === focusedSectionId && node.data?.customKind === 'entry') ||
+          (customSections.find(section => section.id === focusedSectionId)?.preset === node.data?.entityKind &&
+           (node.data?.entityKind === 'weapon' || node.data?.entityKind === 'pet'))
         ) {
           ids.add(node.id)
         }
@@ -718,6 +706,11 @@ export function RelationGraph({
       for (const node of allNodes) {
         if (node.data?.entityType === focusedCategory) ids.add(node.id)
       }
+      if (focusedCategory === 'country') {
+        for (const edge of allEdges) {
+          if (isCountryMembershipEdge(edge.data)) { ids.add(edge.source); ids.add(edge.target) }
+        }
+      }
     } else if (focusedNodeId) {
       ids.add(focusedNodeId)
       // Only one hop: the selected entity plus entities directly connected to it.
@@ -727,7 +720,7 @@ export function RelationGraph({
       }
     }
     return ids
-  }, [allEdges, allNodes, focusedCategory, focusedNodeId, focusedSectionId])
+  }, [allEdges, allNodes, focusedCategory, focusedNodeId, focusedSectionId, customSections])
 
   const {
     showCharacters,
@@ -774,18 +767,12 @@ export function RelationGraph({
   const filteredNodes = useMemo(() => {
     return allNodes.filter((node) => {
       if (focusedNodeIds && !focusedNodeIds.has(node.id)) return false
-      switch (node.data?.entityType) {
-        case 'character':
-          return showCharacters
-        case 'event':
-          return showEvents
-        case 'country':
-          return showCountries
-        default:
-          return true
-      }
+      return graphNodeIsVisible(node.data ?? {}, { showCharacters, showEvents, showCountries }, enabledSectionIds, {
+        weapon: customSections.find(section => section.preset === 'weapon')?.id,
+        pet: customSections.find(section => section.preset === 'pet')?.id,
+      })
     })
-  }, [allNodes, focusedNodeIds, showCharacters, showEvents, showCountries])
+  }, [allNodes, focusedNodeIds, showCharacters, showEvents, showCountries, enabledSectionIds, customSections])
 
   const visibleNodeIds = useMemo(() => new Set(filteredNodes.map((node) => node.id)), [filteredNodes])
   const visibleEdges = useMemo(() => {
@@ -807,12 +794,16 @@ export function RelationGraph({
   }, [allEdges, allNodes, hiddenSectionIds, visibleNodeIds])
 
   const layoutedNodes = useMemo(() => {
-    const savedPositions = loadNodePositions(graphScope)
+    const savedPositions = loadNodePositions(positionScope)
     if (layoutCacheRef.current.scope !== graphScope) {
       layoutCacheRef.current = { scope: graphScope, positions: {} }
     }
     const cache = layoutCacheRef.current.positions
-    const placed: NodeBox[] = []
+    const placed: NodeBox[] = filteredNodes.flatMap((node) => {
+      const key = positionKeyOf(node)
+      const position = savedPositions[key]
+      return position ? [estimateNodeBox(node, position)] : []
+    })
     const total = Math.max(filteredNodes.length, 4)
     const positioned = filteredNodes.map((node, index) => {
       const sectionId = node.data?.customSectionId as string | undefined
@@ -825,6 +816,7 @@ export function RelationGraph({
 
       const key = positionKeyOf(node)
       let position = savedPositions[key] ?? cache[key]
+      const hasStoredPosition = Boolean(position)
       if (!position) {
         position = gridPosition(index, total)
       }
@@ -832,6 +824,7 @@ export function RelationGraph({
       let slot = index
       let attempts = 0
       while (
+        !hasStoredPosition &&
         placed.some((box) => boxesOverlap(box, estimateNodeBox(node, position!))) &&
         attempts < 600
       ) {
@@ -852,7 +845,7 @@ export function RelationGraph({
         .filter(Boolean)
         .join(' '),
     }))
-  }, [filteredNodes, graphScope, hiddenSectionIds, highlightedNodeId, layoutVersion])
+  }, [filteredNodes, positionScope, graphScope, hiddenSectionIds, highlightedNodeId, layoutVersion])
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -871,61 +864,45 @@ export function RelationGraph({
         }
       }
       if (Object.keys(positions).length === 0) return
-      saveNodePositions(graphScope, positions)
+      saveNodePositions(positionScope, positions)
       layoutCacheRef.current = {
         scope: graphScope,
         positions: { ...layoutCacheRef.current.positions, ...positions },
       }
       if (announce) toast.success('布局已保存')
     },
-    [graphScope, nodes],
+    [positionScope, graphScope, nodes],
   )
 
   const autoArrange = useCallback(() => {
     layoutCacheRef.current = { scope: graphScope, positions: {} }
-    saveNodePositions(graphScope, {})
+    saveNodePositions(positionScope, {}, 'replace')
     setLayoutVersion((value) => value + 1)
     window.setTimeout(() => rfRef.current?.fitView({ padding: 0.25, duration: 280 }), 60)
     toast.success('已自动整理，节点不会互相重叠')
-  }, [graphScope])
+  }, [positionScope, graphScope])
 
-  const handleExportImage = useCallback(async () => {
+  const handleExportImage = useCallback(async (options: ExportRelationGraphOptions) => {
     if (exporting) return
     setExporting(true)
     try {
-      const name = await exportRelationGraphPng(nodes, edges, {
+      const { edgeStyle: currentStyle, edgeControls } = useRelationUiStore.getState()
+      const name = await exportRelationGraph(rfRef.current?.getNodes() ?? nodes, edges, {
+        ...options, edgeStyle: currentStyle, edgeControls,
         title: focusLabel ? `${focusLabel}` : 'OC 关系图',
       })
       toast.success(`已导出 ${name}`)
+      setExportOpen(false)
     } catch (cause) {
       console.error('[RelationGraph] export failed', cause)
       toast.error(cause instanceof Error ? cause.message : '导出关系图失败')
+      throw cause
     } finally {
       setExporting(false)
     }
   }, [edges, exporting, focusLabel, nodes])
 
-  const selectedEdge = selectedEdgeId
-    ? edges.find((edge) => edge.id === selectedEdgeId) ?? null
-    : null
-  const selectedEdgeColor = resolveRelationColor(selectedEdge?.data?.color)
-  const selectedEdgeArrow = resolveRelationArrow(selectedEdge?.data?.arrow)
-
-  const applyEdgeStyle = useCallback(
-    (patch: { color?: string; arrow?: 'none' | 'forward' | 'reverse' | 'both' }) => {
-      if (!selectedEdgeId) return
-      // 先即时更新画布，再持久化到 relations 表，避免等待 liveQuery 刷新。
-      setEdges((current) =>
-        current.map((edge) =>
-          String(edge.id) === selectedEdgeId
-            ? { ...edge, data: { ...(edge.data ?? {}), ...patch } }
-            : edge,
-        ),
-      )
-      void updateRelationStyle(selectedEdgeId, patch)
-    },
-    [selectedEdgeId, setEdges],
-  )
+  const editedEdge = edgeEditor ? edges.find(edge => String(edge.id) === edgeEditor.id) : undefined
 
   const toggleSectionVisibility = useCallback(
     (sectionId: string) => {
@@ -941,7 +918,7 @@ export function RelationGraph({
               : node.id
         positions[key] = { x: node.position.x, y: node.position.y }
       }
-      saveNodePositions(graphScope, positions)
+      saveNodePositions(positionScope, positions)
       if (!hiddenSectionIds.has(sectionId)) {
         const snapshot: Record<string, { x: number; y: number }> = {}
         for (const node of nodes) {
@@ -954,14 +931,14 @@ export function RelationGraph({
       } else {
         restoreSnapshotRef.current = true
       }
-      setHiddenSectionIds((current) => {
+      setEnabledSectionIds((current) => {
         const next = new Set(current)
         if (next.has(sectionId)) next.delete(sectionId)
         else next.add(sectionId)
         return next
       })
     },
-    [graphScope, hiddenSectionIds, nodes],
+    [positionScope, graphScope, hiddenSectionIds, nodes],
   )
 
   useEffect(() => {
@@ -995,11 +972,11 @@ export function RelationGraph({
         positions[key] = { x: node.position.x, y: node.position.y }
       }
       if (Object.keys(positions).length > 0) {
-        saveNodePositions(graphScope, positions)
+        saveNodePositions(positionScope, positions)
       }
     }, 500)
     return () => clearTimeout(timer)
-  }, [graphScope, nodes])
+  }, [positionScope, graphScope, nodes])
 
   const handleConnect = useCallback(
     async (connection: Connection) => {
@@ -1141,11 +1118,11 @@ export function RelationGraph({
           onNavigateToEvent?.(entityId)
           break
         case 'country':
-          onNavigateToCountry?.(entityId)
+          setHighlightedNodeId(node.id)
           break
       }
     },
-    [onNavigateToCharacter, onNavigateToEvent, onNavigateToCountry],
+    [onNavigateToCharacter, onNavigateToEvent],
   )
 
   if (loading) {
@@ -1292,12 +1269,15 @@ export function RelationGraph({
     let createdNodeId: string | null = null
     if (createType === 'section') {
       const section = createSection(name)
+      setEnabledSectionIds(current => new Set([...current, section.id]))
       createdNodeId = `custom-section:${section.id}`
     } else if (createType.startsWith('entry:')) {
       const sectionId = createType.slice('entry:'.length)
       const entry = addEntry(sectionId, name)
+      setEnabledSectionIds(current => new Set([...current, sectionId]))
       createdNodeId = `custom-entry:${entry.id}`
     } else if (createType === 'character') {
+      setShowCharacters(true)
       const id = await createCharacter({
         name,
         aliases: [],
@@ -1321,6 +1301,7 @@ export function RelationGraph({
       })
       createdNodeId = `character-${id}`
     } else if (createType === 'country') {
+      setShowCountries(true)
       const id = await createCountry({
         name,
         parentId: null,
@@ -1332,6 +1313,7 @@ export function RelationGraph({
       })
       createdNodeId = `country-${id}`
     } else {
+      setShowEvents(true)
       const id = await createEvent({
         title: name,
         time: '',
@@ -1557,9 +1539,10 @@ export function RelationGraph({
         </button>
         <button
           type="button"
-          onClick={() => void handleExportImage()}
+          onClick={() => setExportOpen(true)}
           disabled={exporting}
-          title="导出关系图 PNG"
+          title="导出关系图"
+          aria-label="导出关系图"
           className="flex h-8 w-8 items-center justify-center rounded border border-line bg-paper text-ink-muted shadow-sm transition-colors hover:border-line-hover hover:text-ink disabled:opacity-50"
         >
           <Download size={13} strokeWidth={2} />
@@ -1590,63 +1573,7 @@ export function RelationGraph({
         </button>
       </div>
 
-      {selectedEdge ? (
-        <div className="absolute bottom-16 left-1/2 z-30 -translate-x-1/2 rounded-xl border border-line bg-paper/95 p-2.5 shadow-lg backdrop-blur md:bottom-4">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] text-ink-muted">
-                关系线样式 · <span style={{ color: selectedEdgeColor }}>文字与线条同色</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedEdgeId(null)}
-                className="text-ink-faint hover:text-ink"
-                title="关闭"
-              >
-                <X size={12} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {RELATION_COLORS.map((color) => (
-                <button
-                  key={color.value}
-                  type="button"
-                  onClick={() => applyEdgeStyle({ color: color.value })}
-                  title={color.name}
-                  aria-label={color.name}
-                  className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 ${
-                    selectedEdgeColor === color.value
-                      ? 'border-ink ring-2 ring-line-hover'
-                      : 'border-line'
-                  }`}
-                  style={{ backgroundColor: color.value }}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-1">
-              {RELATION_ARROW_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    applyEdgeStyle({ arrow: option.value })
-                    toast.success(`箭头已设为${option.label}`)
-                  }}
-                  title={option.hint}
-                  className={`h-6 flex-1 rounded border px-1.5 text-[10px] transition-colors ${
-                    selectedEdgeArrow === option.value
-                      ? 'border-line-hover bg-paper-card text-ink'
-                      : 'border-line text-ink-muted hover:text-ink'
-                  }`}
-                >
-                  {option.glyph} {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
+      {exportOpen ? <RelationExportDialog busy={exporting} edgeStyle={edgeStyle} onClose={() => setExportOpen(false)} onExport={handleExportImage}/> : null}
       {relationDialogOpen ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20 p-4">
           <div className="w-[340px] rounded border border-line bg-paper p-4 shadow-lg">
@@ -1726,6 +1653,9 @@ export function RelationGraph({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={(_event, node) => {
+          if (node.data?.entityType === 'country') onNavigateToCountry?.(Number(node.data.entityId))
+        }}
         onNodeContextMenu={(event, node) => {
           event.preventDefault()
           setHighlightedNodeId(null)
@@ -1734,16 +1664,17 @@ export function RelationGraph({
         onPaneClick={() => {
           setContextMenu(null)
           setHighlightedNodeId(null)
-          setSelectedEdgeId(null)
         }}
         onPaneContextMenu={(event) => event.preventDefault()}
         onEdgeClick={(_event, edge) => {
           setHighlightedNodeId(null)
-          setSelectedEdgeId(String(edge.id).includes('->') ? String(edge.id) : null)
+          const edit = edge.data?.onEditLabel as ((id: string, label: string) => void) | undefined
+          edit?.(String(edge.id), String(edge.data?.relation ?? edge.data?.label ?? '相关'))
         }}
         onEdgeContextMenu={(event, edge) => {
           event.preventDefault()
-          setSelectedEdgeId(String(edge.id).includes('->') ? String(edge.id) : null)
+          const edit = edge.data?.onEditLabel as ((id: string, label: string) => void) | undefined
+          edit?.(String(edge.id), String(edge.data?.relation ?? edge.data?.label ?? '相关'))
         }}
         onConnect={(connection) => void handleConnect(connection)}
         onNodeDragStart={(event, node) => {
@@ -1843,60 +1774,19 @@ export function RelationGraph({
           )
         : null}
 
-      {edgeEditor
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/25 p-4"
-              onClick={(event) => {
-                if (event.target === event.currentTarget) setEdgeEditor(null)
-              }}
-            >
-              <div className="w-[360px] rounded-xl border border-line bg-paper p-4 shadow-xl">
-                <h3 className="font-serif text-base text-ink">编辑关系标签</h3>
-                <p className="mt-1 text-[11px] text-ink-muted">
-                  修改后会同步到相关实体面板。
-                </p>
-                <input
-                  ref={edgeEditorInputRef}
-                  autoFocus
-                  value={edgeEditorValue}
-                  onChange={(event) => setEdgeEditorValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      const next =
-                        (edgeEditorInputRef.current?.value ?? edgeEditorValue).trim() || '相关'
-                      edgeEditor.save(next)
-                      setEdgeEditor(null)
-                    }
-                    if (event.key === 'Escape') setEdgeEditor(null)
-                  }}
-                  className="mt-3 h-9 w-full rounded-lg border border-line bg-paper-card px-3 text-sm text-ink outline-none focus:border-line-hover"
-                />
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    onClick={() => setEdgeEditor(null)}
-                    className="h-8 rounded-lg border border-line px-3 text-xs text-ink-muted"
-                  >
-                    取消
-                  </button>
-                  <button
-                    onClick={() => {
-                      const next =
-                        (edgeEditorInputRef.current?.value ?? edgeEditorValue).trim() || '相关'
-                      edgeEditor.save(next)
-                      setEdgeEditor(null)
-                    }}
-                    className="h-8 rounded-lg bg-ink px-3 text-xs text-paper"
-                  >
-                    保存
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {edgeEditor ? <RelationEditDialog key={edgeEditor.id} label={edgeEditor.label}
+        color={editedEdge?.data?.color} arrow={editedEdge?.data?.arrow}
+        sourceName={String(allNodes.find(node => node.id === editedEdge?.source)?.data?.label ?? '起点')}
+        targetName={String(allNodes.find(node => node.id === editedEdge?.target)?.data?.label ?? '终点')}
+        canStyle={Boolean(editedEdge?.data?.onStyle)} onClose={() => setEdgeEditor(null)}
+        onSave={async draft => {
+          if (draft.label !== edgeEditor.label) await edgeEditor.save(draft.label)
+          if (editedEdge?.data?.onStyle) {
+            await updateRelationStyle(edgeEditor.id, { color: draft.color, arrow: draft.arrow })
+            setEdges(current => current.map(edge => String(edge.id) === edgeEditor.id
+              ? { ...edge, data: { ...edge.data, color: draft.color, arrow: draft.arrow } } : edge))
+          }
+        }} /> : null}
 
       {createOpen ? createPortal(
         <div

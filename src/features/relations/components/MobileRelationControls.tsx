@@ -33,6 +33,7 @@ function CategoryChip({
   return (
     <button
       onClick={onClick}
+      aria-pressed={Boolean(active)}
       className={`flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] transition-all duration-150 active:rotate-3 active:scale-95 ${
         active
           ? 'border-line-hover bg-black/5 text-ink dark:bg-white/5'

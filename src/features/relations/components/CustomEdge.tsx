@@ -8,11 +8,10 @@ import {
   useReactFlow,
   type EdgeProps,
 } from '@xyflow/react'
-import { Palette } from 'lucide-react'
 import { useRelationUiStore } from '../store'
 import {
   resolveRelationArrow,
-  resolveRelationColor,
+  relationColorAppearance,
 } from '../style'
 import { useFloatingEdge } from './useFloatingEdge'
 
@@ -82,7 +81,7 @@ export function CustomEdge({
   const startY = anchors.sourceY
   const endX = anchors.targetX
   const endY = anchors.targetY
-  const color = resolveRelationColor(data?.color)
+  const { color, outline, labelBackground } = relationColorAppearance(data?.color)
   const arrow = resolveRelationArrow(data?.arrow)
 
   const dx = endX - startX
@@ -146,6 +145,9 @@ export function CustomEdge({
 
   return (
     <>
+      {outline ? (
+        <path d={path} fill="none" stroke={outline} strokeWidth={3.6} style={{ pointerEvents: 'none' }} />
+      ) : null}
       <BaseEdge
         id={id}
         path={path}
@@ -160,6 +162,9 @@ export function CustomEdge({
             edgeStyle === 'straight' ? startY : controlY,
           )}
           fill={color}
+          stroke={outline}
+          strokeWidth={outline ? 1 : undefined}
+          strokeLinejoin="round"
           style={{ pointerEvents: 'none' }}
         />
       ) : null}
@@ -172,6 +177,9 @@ export function CustomEdge({
             edgeStyle === 'straight' ? endY : controlY,
           )}
           fill={color}
+          stroke={outline}
+          strokeWidth={outline ? 1 : undefined}
+          strokeLinejoin="round"
           style={{ pointerEvents: 'none' }}
         />
       ) : null}
@@ -219,7 +227,7 @@ export function CustomEdge({
                     setValue(String(data?.label ?? '相关'))
                   }
                 }}
-                style={{ color }}
+                style={{ color, backgroundColor: labelBackground }}
                 className="h-6 w-24 rounded border border-line bg-paper px-1.5 text-[10px] outline-none"
               />
             ) : (
@@ -237,8 +245,8 @@ export function CustomEdge({
                   committedRef.current = false
                   setEditing(true)
                 }}
-                title={readOnly ? '此连线不可编辑' : '点击编辑关系标签；拖动线条可调整曲线'}
-                style={{ color }}
+                title={readOnly ? '此连线不可编辑' : '点击编辑关系标签与颜色'}
+                style={{ color, backgroundColor: labelBackground }}
                 className={`rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] transition-colors ${
                   readOnly ? 'cursor-default' : 'hover:border-line-hover'
                 }`}
@@ -246,20 +254,7 @@ export function CustomEdge({
                 {String(data?.label ?? '相关')}
               </button>
             )}
-            {onStyle && !editing ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  const styleId = String(data?.relationId ?? edgeId)
-                  if (styleId) onStyle(styleId)
-                }}
-                title="设置箭头方向与颜色"
-                className="ml-0.5 flex h-5 w-5 items-center justify-center rounded text-ink-faint hover:bg-paper-card hover:text-ink"
-              >
-                <Palette size={11} strokeWidth={2} />
-              </button>
-            ) : null}
+
             {onDelete && !editing ? (
               <button
                 type="button"

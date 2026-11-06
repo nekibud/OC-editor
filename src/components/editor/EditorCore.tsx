@@ -220,6 +220,7 @@ interface EditorCoreProps {
   onWikiLinkClick?: (id: string) => void
   plain?: boolean
   /** Hides the selection bubble menu; used by the novel page toolbar. */
+  preserveWhitespace?: boolean
   hideBubbleMenu?: boolean
   /** Hides the custom right-click menu; used by the novel page. */
   hideContextMenu?: boolean
@@ -262,7 +263,7 @@ function BubbleMenuButtons({ editor }: { editor: Editor }) {
 }
 
 export function EditorCore({
-  onReady, onCharacterCount, onContentChange, content, placeholder, onMentionClick, onWikiLinkClick, plain, hideBubbleMenu, hideContextMenu,
+  onReady, onCharacterCount, onContentChange, content, placeholder, onMentionClick, onWikiLinkClick, plain, hideBubbleMenu, hideContextMenu, preserveWhitespace,
 }: EditorCoreProps) {
   const editorId = useId()
   const [blockMenuPosition, setBlockMenuPosition] = useState<{ x: number; y: number } | null>(null)
@@ -326,6 +327,7 @@ export function EditorCore({
 
   const editor = useEditor({
     immediatelyRender: false,
+    parseOptions: preserveWhitespace ? { preserveWhitespace: 'full' } : undefined,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },

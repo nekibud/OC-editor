@@ -103,13 +103,14 @@ function ImageBlockView({ node, updateAttributes, deleteNode }: ReactNodeViewPro
 
   return (
     <NodeViewWrapper>
-      <div className="group relative flex justify-center" contentEditable={false}>
+      <div className="editor-image-block flex justify-center" contentEditable={false}>
+        <div className="editor-image-frame group relative max-w-full" style={width ? { width: `${width}px` } : undefined}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={getImageUrl(src, 'avatar')}
           alt=""
-          className="max-w-full"
-          style={width ? { width: `${width}px` } : undefined}
+          className="block max-w-full"
+          style={width ? { width: '100%' } : undefined}
           draggable={true}
         />
         <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -129,17 +130,22 @@ function ImageBlockView({ node, updateAttributes, deleteNode }: ReactNodeViewPro
           </button>
         </div>
         <div
+          role="button"
+          aria-label="缩放图片"
           className="absolute bottom-1 right-1 h-4 w-4 cursor-se-resize opacity-0 group-hover:opacity-100"
           style={{
             background: 'linear-gradient(135deg, transparent 50%, var(--color-ink-muted) 50%)',
           }}
           onMouseDown={(e) => {
             e.preventDefault()
+            e.stopPropagation()
             const startX = e.clientX
-            const startWidth = width || 300
+            const frame = e.currentTarget.parentElement
+            const startWidth = frame?.getBoundingClientRect().width || width || 240
+            const maxWidth = frame?.parentElement?.clientWidth || Number.POSITIVE_INFINITY
             const move = (ev: MouseEvent) => {
               const diff = ev.clientX - startX
-              updateAttributes({ width: Math.max(50, startWidth + diff) })
+              updateAttributes({ width: Math.min(maxWidth, Math.max(50, startWidth + diff)) })
             }
             const up = () => {
               document.removeEventListener('mousemove', move)
@@ -151,6 +157,7 @@ function ImageBlockView({ node, updateAttributes, deleteNode }: ReactNodeViewPro
             document.addEventListener('mouseup', up)
           }}
         />
+        </div>
       </div>
     </NodeViewWrapper>
   )

@@ -217,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <EditorProvider>
           <MobileNavigationProvider>
             <MobilePageHeaderProvider>
-              <AppShellChrome settings={settings}>
+              <AppShellChrome key={activeWorld.id} settings={settings}>
                 {children}
               </AppShellChrome>
               <TrashOverlayRenderer />

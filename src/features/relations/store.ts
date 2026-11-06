@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { DEFAULT_GRAPH_VISIBILITY } from './category-visibility'
 
 const EDGE_CONTROLS_KEY = 'oc-editor-relation-edge-controls'
 
@@ -52,9 +53,7 @@ interface RelationUiState {
  * Zustand 只负责筛选/可见性，切换页面后不会丢失。
  */
 export const useRelationUiStore = create<RelationUiState>((set) => ({
-  showCharacters: true,
-  showEvents: true,
-  showCountries: true,
+  ...DEFAULT_GRAPH_VISIBILITY,
   edgeStyle: 'bezier',
   edgeControls: loadEdgeControls(),
   setEdgeControl: (id, controls) =>

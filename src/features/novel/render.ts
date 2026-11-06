@@ -1,5 +1,6 @@
 'use client'
 
+import { novelFontCss } from './writing'
 import { getImageUrl } from '@/lib/image-service'
 import type { Novel, NovelExportOptions, NovelPageFormat } from './types'
 import { getNovelPageDimensions, novelBackgroundDataUrl } from './background'
@@ -14,9 +15,30 @@ export interface NovelPageImage {
   isCover: boolean
 }
 
+export interface NovelRun { text: string; bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean }
+
+export function readNovelRuns(element: Element): NovelRun[] {
+  const runs: NovelRun[] = []
+  const visit = (node: Node, bold = false, italic = false, underline = false, strike = false): void => {
+    if (node.nodeType === 3) { if (node.textContent) runs.push({ text: node.textContent, bold, italic, underline, strike }); return }
+    if (!(node instanceof Element)) return
+    if (node.tagName === 'BR') { runs.push({ text: '\n', bold, italic, underline, strike }); return }
+    const style = (node as HTMLElement).style
+    const nextBold = bold || /^(STRONG|B)$/.test(node.tagName) || /^(bold|bolder)$/.test(style.fontWeight) || Number(style.fontWeight) >= 600
+    const nextItalic = italic || /^(EM|I)$/.test(node.tagName) || style.fontStyle === 'italic'
+    const nextUnderline = underline || node.tagName === 'U' || style.textDecorationLine.includes('underline')
+    const nextStrike = strike || /^(S|STRIKE|DEL)$/.test(node.tagName) || style.textDecorationLine.includes('line-through')
+    for (const child of Array.from(node.childNodes)) visit(child, nextBold, nextItalic, nextUnderline, nextStrike)
+  }
+  visit(element)
+  return runs
+}
+
 export interface NovelBlock {
   kind: 'heading' | 'paragraph' | 'quote' | 'list' | 'image'
   text?: string
+  runs?: NovelRun[]
+  headingLevel?: number
   src?: string
 }
 
@@ -29,18 +51,18 @@ export function parseNovelBlocks(html: string): NovelBlock[] {
     const tag = node.tagName.toLowerCase()
     if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
       const text = node.textContent?.trim()
-      if (text) blocks.push({ kind: 'heading', text })
+      if (text) blocks.push({ kind: 'heading', text, runs: readNovelRuns(node), headingLevel: Number(tag.slice(1)) })
       return
     }
     if (tag === 'blockquote') {
       const text = node.textContent?.trim()
-      if (text) blocks.push({ kind: 'quote', text })
+      if (text) blocks.push({ kind: 'quote', text, runs: readNovelRuns(node) })
       return
     }
     if (tag === 'ul' || tag === 'ol') {
       for (const li of Array.from(node.querySelectorAll(':scope > li'))) {
         const text = li.textContent?.trim()
-        if (text) blocks.push({ kind: 'list', text })
+        if (text) blocks.push({ kind: 'list', text, runs: readNovelRuns(li) })
       }
       return
     }
@@ -55,8 +77,8 @@ export function parseNovelBlocks(html: string): NovelBlock[] {
       return
     }
     if (tag === 'p') {
-      const text = node.textContent?.trim()
-      if (text) blocks.push({ kind: 'paragraph', text })
+      const text = node.textContent ?? ''
+      blocks.push({ kind: 'paragraph', text, runs: readNovelRuns(node) })
       return
     }
     if (tag === 'div') {
@@ -147,7 +169,7 @@ export async function renderNovelPages(
   const lineHeight = Math.round(bodySize * 1.9)
   const titleSize = Math.round(bodySize * 2.3)
   const chapterSize = Math.round(bodySize * 1.55)
-  const fontFamily = '"Noto Serif SC", "Songti SC", "SimSun", serif'
+  const fontFamily = novelFontCss(novel.fontFamily)
   const ink = '#3b3227'
 
   const backgroundSrc =
@@ -249,6 +271,7 @@ export async function renderNovelPages(
     pages[pageIndex - 1].isCover = false
 
     const newPage = (): void => {
+      const font = ctx.font, fill = ctx.fillStyle, align = ctx.textAlign, baseline = ctx.textBaseline
       const canvas = ctx.canvas
       ctx.fillStyle = 'rgba(80, 64, 45, 0.65)'
       ctx.font = `${Math.round(bodySize * 0.7)}px ${fontFamily}`
@@ -260,6 +283,7 @@ export async function renderNovelPages(
       contentPageNumber += 1
       pages[pageIndex - 1].pageNumber = contentPageNumber
       pages[pageIndex - 1].isCover = false
+      ctx.font = font; ctx.fillStyle = fill; ctx.textAlign = align; ctx.textBaseline = baseline
       y = contentTop
     }
 
@@ -296,7 +320,7 @@ export async function renderNovelPages(
       }
 
       const text = block.text ?? ''
-      if (!text.trim()) continue
+      if (!text.trim()) { if (block.kind === 'paragraph') { ensureSpace(lineHeight); y += lineHeight }; continue }
       const isHeading = block.kind === 'heading'
       const isQuote = block.kind === 'quote'
       const isList = block.kind === 'list'
@@ -305,17 +329,42 @@ export async function renderNovelPages(
           ? `600 ${Math.round(bodySize * 1.28)}px ${fontFamily}`
           : `${bodySize}px ${fontFamily}`
       ctx.fillStyle = isQuote ? '#66533c' : ink
-      const lines = wrapText(
-        ctx,
-        `${isList ? '· ' : ''}${text}`,
-        isQuote ? contentWidth * 0.9 : contentWidth,
-      )
-      const lineH = isHeading ? lineHeight * 1.15 : lineHeight
-      for (const line of lines) {
-        ensureSpace(lineH)
-        const x = isQuote ? margin + bodySize : margin
-        ctx.fillText(line, x, y)
-        y += lineH
+      if (block.runs?.length) {
+        let x = isQuote ? margin + bodySize : margin
+        const left = x
+        const right = left + (isQuote ? contentWidth * 0.9 : contentWidth)
+        for (const run of block.runs) {
+          ctx.font = `${run.italic ? 'italic ' : ''}${run.bold ? '700 ' : ''}${bodySize}px ${fontFamily}`
+          for (const char of Array.from(run.text)) {
+            const width = ctx.measureText(char).width
+            if (char === '\n' || (x + width > right && x > left)) {
+              y += lineHeight; ensureSpace(lineHeight); x = left
+              if (char === '\n') continue
+            }
+            ensureSpace(lineHeight)
+            ctx.fillText(char, x, y)
+            if (run.underline || run.strike) {
+              ctx.save()
+              ctx.strokeStyle = ctx.fillStyle
+              ctx.lineWidth = Math.max(1, bodySize * .055)
+              for (const offset of [run.underline ? bodySize * 1.03 : null, run.strike ? bodySize * .5 : null]) {
+                if (offset === null) continue
+                ctx.beginPath(); ctx.moveTo(x, y + offset); ctx.lineTo(x + width, y + offset); ctx.stroke()
+              }
+              ctx.restore()
+            }
+            x += width
+          }
+        }
+        y += lineHeight
+      } else {
+        const lines = wrapText(ctx, `${isList ? '· ' : ''}${text}`, isQuote ? contentWidth * 0.9 : contentWidth)
+        const lineH = isHeading ? lineHeight * 1.15 : lineHeight
+        for (const line of lines) {
+          ensureSpace(lineH)
+          ctx.fillText(line, isQuote ? margin + bodySize : margin, y)
+          y += lineH
+        }
       }
       y += isHeading ? bodySize * 0.65 : bodySize * 0.45
     }

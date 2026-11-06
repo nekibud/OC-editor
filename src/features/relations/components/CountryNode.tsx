@@ -20,7 +20,7 @@ export function CountryNode({ data }: NodeProps) {
           {data.label as string}
         </span>
       </div>
-      <RelationHandle centerY={60} size={20} />
+      <RelationHandle centerY={28} size={12} />
     </>
   )
 }
