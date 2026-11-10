@@ -1,4 +1,6 @@
 import { db } from '@/lib/db'
+import { loadCharacterFolders, saveCharacterFolders } from '@/features/characters/folders'
+import { parseCharacterFolders, planCharacterFolderImport } from '@/features/characters/folder-backup'
 import { getActiveWorldId, getLegacyWorldId } from '@/lib/world-scope'
 import type { QueryClient } from '@tanstack/react-query'
 import type { Table } from 'dexie'
@@ -13,6 +15,7 @@ interface ImportPayload {
     worldEntries: unknown[]
     tags: unknown[]
     maps?: unknown[]
+    characterFolders?: unknown[]
     worlds?: unknown[]
   }
 }
@@ -128,6 +131,8 @@ export function validateImportData(json: unknown): ImportSummary {
   if (data.maps !== undefined && !Array.isArray(data.maps)) {
     throw new Error('data.maps 必须是数组')
   }
+
+  parseCharacterFolders(data.characterFolders)
 
   return {
     characters: (data.characters as unknown[]).length,
@@ -274,7 +279,13 @@ export async function importData(
   const fallbackWorldId = getActiveWorldId() ?? getLegacyWorldId() ?? undefined
   const withWorld = (items: unknown[]): unknown[] =>
     items.map((item) => remapRecordWorldId(item, worldMap, fallbackWorldId))
-  const characters = withWorld(records.characters)
+  const folderPlan = planCharacterFolderImport(
+    loadCharacterFolders(true).map(folder => ({ ...folder, worldId: folder.worldId ?? getLegacyWorldId() ?? undefined })),
+    parseCharacterFolders(records.characterFolders).map(folder => remapRecordWorldId(folder, worldMap, fallbackWorldId) as typeof folder),
+    records.characters,
+    strategy,
+  )
+  const characters = withWorld(folderPlan.characters)
   const events = withWorld(records.events)
   const countries = withWorld(records.countries)
   const worldEntries = withWorld(records.worldEntries)
@@ -308,6 +319,7 @@ export async function importData(
       worldEntries.length +
       records.tags.length +
       mapRecords.length
+    saveCharacterFolders(folderPlan.folders, true)
     queryClient?.invalidateQueries()
     return { added: total, skipped: 0, overwritten: 0 }
   }
@@ -334,6 +346,7 @@ export async function importData(
     totalOverwritten += result.overwritten
   }
 
+  saveCharacterFolders(folderPlan.folders, true)
   queryClient?.invalidateQueries()
 
   return { added: totalAdded, skipped: totalSkipped, overwritten: totalOverwritten }

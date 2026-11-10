@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { activeWorldIdForWrite, belongsToActiveWorld, WORLD_CHANGED_EVENT } from '@/lib/world-scope'
 import { db } from '@/lib/db'
 
 /**
@@ -9,6 +10,7 @@ import { db } from '@/lib/db'
  * 绝不会删除角色数据。
  */
 export interface CharacterFolder {
+  worldId?: number
   id: string
   name: string
   order: number
@@ -24,31 +26,34 @@ function makeId(): string {
     : `folder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function loadCharacterFolders(): CharacterFolder[] {
+export function loadCharacterFolders(allWorlds = false): CharacterFolder[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
+      ?? window.localStorage.getItem('oc-studio-character-folders-v1')
     if (!raw) return []
     const parsed = JSON.parse(raw) as CharacterFolder[]
     if (!Array.isArray(parsed)) return []
     return parsed
       .filter((folder) => folder && typeof folder.id === 'string')
       .map((folder, index) => ({
+        worldId: folder.worldId,
         id: folder.id,
         name: String(folder.name || '未命名文件夹'),
         order: typeof folder.order === 'number' ? folder.order : index,
         createdAt: typeof folder.createdAt === 'number' ? folder.createdAt : Date.now(),
       }))
+      .filter(folder => allWorlds || belongsToActiveWorld(folder))
       .sort((a, b) => a.order - b.order)
   } catch {
     return []
   }
 }
 
-function saveCharacterFolders(folders: CharacterFolder[]): void {
+export function saveCharacterFolders(folders: CharacterFolder[], allWorlds = false): void {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(folders))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(allWorlds ? folders : [...loadCharacterFolders(true).filter(folder => !belongsToActiveWorld(folder)), ...folders]))
     window.dispatchEvent(new Event(CHANGE_EVENT))
   } catch {
     // ignore quota errors
@@ -59,7 +64,7 @@ async function clearFolderAssignments(folderId: string): Promise<number> {
   const now = Date.now()
   let changed = 0
   await db.characters
-    .filter((character) => character.folderId === folderId)
+    .filter((character) => character.folderId === folderId && belongsToActiveWorld(character))
     .modify((character) => {
       character.folderId = null
       character.updatedAt = now
@@ -89,15 +94,18 @@ export function useCharacterFolders(): CharacterFolderApi {
     reload()
     window.addEventListener(CHANGE_EVENT, reload)
     window.addEventListener('storage', reload)
+    window.addEventListener(WORLD_CHANGED_EVENT, reload)
     return () => {
       window.removeEventListener(CHANGE_EVENT, reload)
       window.removeEventListener('storage', reload)
+      window.removeEventListener(WORLD_CHANGED_EVENT, reload)
     }
   }, [])
 
   const createFolder = useCallback((name: string): CharacterFolder => {
     const current = loadCharacterFolders()
     const folder: CharacterFolder = {
+      worldId: activeWorldIdForWrite(),
       id: makeId(),
       name: name.trim() || '新文件夹',
       order: current.length > 0 ? Math.max(...current.map((item) => item.order)) + 1 : 0,
@@ -143,14 +151,17 @@ export async function moveCharactersToFolder(
 ): Promise<void> {
   if (characterIds.length === 0) return
   const now = Date.now()
-  await db.characters
-    .where('id')
-    .anyOf(characterIds)
-    .modify((character) => {
-      character.folderId = folderId
-      character.updatedAt = now
-      character._syncStatus = 'pending'
-    })
+  await db.transaction('rw', db.characters, async () => {
+    await db.characters
+      .where('id')
+      .anyOf(characterIds)
+      .and(character => !character.deleted && belongsToActiveWorld(character))
+      .modify((character) => {
+        character.folderId = folderId
+        character.updatedAt = now
+        character._syncStatus = 'pending'
+      })
+  })
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('data-updated'))
   }

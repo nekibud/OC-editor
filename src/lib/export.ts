@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { loadCharacterFolders, type CharacterFolder } from '@/features/characters/folders'
 import { filterByActiveWorld } from '@/lib/world-scope'
 import { createZip, downloadBlob } from '@/lib/zip'
 
@@ -18,6 +19,7 @@ export interface ExportPayload {
     worldEntries: unknown[]
     tags: unknown[]
     maps: unknown[]
+    characterFolders: CharacterFolder[]
     /** 世界观列表；旧备份没有该字段时全部内容归入默认世界观。 */
     worlds?: unknown[]
   }
@@ -41,7 +43,7 @@ export async function exportAllData(): Promise<ExportPayload> {
       app: 'OC editor',
       format: 'oc-editor-backup',
       offline: true,
-      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'maps'],
+      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'maps', 'characterFolders'],
     },
     data: {
       characters,
@@ -50,6 +52,7 @@ export async function exportAllData(): Promise<ExportPayload> {
       worldEntries,
       tags,
       maps,
+      characterFolders: loadCharacterFolders(true),
       worlds,
     },
   }
@@ -70,6 +73,7 @@ export async function exportAllDataZip(): Promise<{ name: string; size: number }
       worldEntries: data.data.worldEntries.length,
       tags: data.data.tags.length,
       maps: data.data.maps.length,
+      characterFolders: data.data.characterFolders.length,
     },
     note: '地图图层不直接存入备份；使用 seed + params 可确定性重建完全相同的图层。',
   }
@@ -80,7 +84,7 @@ export async function exportAllDataZip(): Promise<{ name: string; size: number }
     '此 ZIP 由 OC editor 在本机生成，不包含遥测或在线资源。',
     '',
     '内容：',
-    '- oc-data.json：角色、事件、国家、词条、标签、关系（嵌入条目字段）与地图参数/种子。',
+    '- oc-data.json：角色、事件、国家、词条、标签、关系（嵌入条目字段）、角色文件夹与地图参数/种子。',
     '- manifest.json：备份摘要。',
     '',
     '恢复：在 OC editor 的“设置 → 数据”中选择“导入 JSON / ZIP...”，选择本文件即可。',

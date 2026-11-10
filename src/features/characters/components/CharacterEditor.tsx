@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Save, ArrowLeft, Plus, X, Download, Film } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { DocumentEditor } from '@/components/editor/DocumentEditor'
-import type { Character, CharacterCustomField, RelatedCharacter } from '@/types'
+import type { Character, CharacterKind, CharacterCustomField, RelatedCharacter } from '@/types'
 import type { CharacterFormData } from '../types'
 import { useCharacter, useUpdateCharacter } from '../hooks/useCharacters'
 import { useCharacterList } from '../hooks/useCharacters'
@@ -19,6 +19,8 @@ import { ProfileBannerEditor } from '@/components/shared/ProfileBannerEditor'
 import { resolveImageUrl, saveBlobToDisk } from '@/lib/image-service'
 import { downloadMedia } from '@/lib/download'
 import { useCustomSections } from '@/features/custom-sections'
+import { selectedRelatedKind, replaceRelatedKind, unmatchedEquipmentText } from '../equipment-links'
+import { getEntityInfoFields, readEntityInfo } from '../entity-info'
 import { createRelation, deleteRelation } from '@/features/relations/services'
 
 interface CharacterEditorProps {
@@ -140,6 +142,9 @@ function CharacterEditorInner({
 }) {
   const kindLabel =
     character.entityKind === 'weapon' ? '武器' : character.entityKind === 'pet' ? '宠物' : '角色'
+  const isCharacter = !character.entityKind || character.entityKind === 'character'
+  const kindFields = getEntityInfoFields(character.entityKind)
+  const [entityInfo, setEntityInfo] = useState(() => readEntityInfo(character))
   const [name, setName] = useState(character.name)
   const [aliasesStr, setAliasesStr] = useState(safeAliasesJoin(character.aliases))
   const [race, setRace] = useState(character.race)
@@ -255,7 +260,7 @@ function CharacterEditorInner({
   const characterItems: RelatedItem[] = useMemo(
     () =>
       allCharacters
-        .filter((c) => c.id !== character.id)
+        .filter((c) => c.id !== character.id && (c.entityKind ?? 'character') === 'character')
         .map((c) => ({
           id: c.id as number,
           name: c.name,
@@ -264,18 +269,22 @@ function CharacterEditorInner({
     [allCharacters, character.id],
   )
 
-  const relatedCharacterIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          relatedCharacters
-            .filter((rc) => rc.characterId !== undefined)
-            .map((rc) => rc.characterId as number),
-        ),
-      ),
-    [relatedCharacters],
-  )
+  const relatedCharacterIds = selectedRelatedKind(relatedCharacters, allCharacters, 'character')
+  const weaponIds = selectedRelatedKind(relatedCharacters, allCharacters, 'weapon')
+  const petIds = selectedRelatedKind(relatedCharacters, allCharacters, 'pet')
+  const equipmentItems = (kind: 'weapon' | 'pet'): RelatedItem[] => allCharacters
+    .filter(entry => entry.entityKind === kind && typeof entry.id === 'number')
+    .map(entry => ({ id: entry.id!, name: entry.name }))
 
+  const handleRelatedKindChange = (kind: CharacterKind, ids: number[]): void => {
+    const previous = selectedRelatedKind(relatedCharacters, allCharacters, kind)
+    for (const related of relatedCharacters) {
+      if (related.characterId === undefined || !previous.includes(related.characterId) || ids.includes(related.characterId)) continue
+      const source = Math.min(character.id!, related.characterId), target = Math.max(character.id!, related.characterId)
+      void deleteRelation(related.relationId ?? `character:${source}->character:${target}`)
+    }
+    setRelatedCharacters(current => replaceRelatedKind(current, allCharacters, kind, ids))
+  }
   /** 同一个角色可以有多条关系：按角色分组展示，每组可继续“+ 添加关系”。 */
   const groupedRelations = useMemo(() => {
     const groups: Array<{
@@ -286,6 +295,8 @@ function CharacterEditorInner({
     }> = []
     const indexByKey = new Map<string, number>()
     relatedCharacters.forEach((rc, index) => {
+      const entry = allCharacters.find(item => item.id === rc.characterId)
+      if (entry && (entry.entityKind ?? 'character') !== 'character') return
       const key = rc.characterId !== undefined ? `id:${rc.characterId}` : `legacy:${index}`
       const existing = indexByKey.get(key)
       if (existing !== undefined) {
@@ -321,31 +332,6 @@ function CharacterEditorInner({
     [character.id],
   )
 
-  const handleRelatedCharactersChange = useCallback(
-    (ids: number[]) => {
-      const next: RelatedCharacter[] = []
-      for (const id of ids) {
-        const existing = relatedCharacters.filter((rc) => rc.characterId === id)
-        if (existing.length > 0) {
-          next.push(...existing)
-          continue
-        }
-        const c = allCharacters.find((ch) => ch.id === id)
-        next.push({
-          characterId: id,
-          name: c ? c.name : '',
-          relation: '',
-        })
-      }
-      // 从选择器移除某个对象时，同时删除它的全部关系记录，避免同步逻辑又把关系补回来。
-      for (const related of relatedCharacters) {
-        if (related.characterId === undefined || ids.includes(related.characterId)) continue
-        if (related.relationId) void deleteRelation(related.relationId)
-      }
-      setRelatedCharacters(next)
-    },
-    [allCharacters, relatedCharacters],
-  )
 
   const countryItems: RelatedItem[] = useMemo(
     () =>
@@ -433,6 +419,7 @@ function CharacterEditorInner({
         birthday,
         ...extraInfo,
         customFields,
+        entityInfo,
         hiddenFields,
         animationUrl,
         animationType,
@@ -480,6 +467,7 @@ function CharacterEditorInner({
     height,
     birthday,
     extraInfo,
+    entityInfo,
     customFields,
     hiddenFields,
     animationUrl,
@@ -508,7 +496,7 @@ function CharacterEditorInner({
     return () => window.clearTimeout(timer)
   }, [docRevision, name, performSave])
 
-  const infoRows: Array<{
+  const characterInfoRows: Array<{
     key: string
     label: string
     value: string
@@ -528,9 +516,17 @@ function CharacterEditorInner({
     })),
   ]
 
+  const countryLabel = isCharacter ? '国籍' : character.entityKind === 'weapon' ? '产地国家' : '生活地区'
+  const infoRows = isCharacter ? characterInfoRows : [characterInfoRows[0], ...kindFields.map(field => ({
+    key: `entity:${field.key}`, label: field.label, value: entityInfo[field.key] ?? '',
+    onChange: (value: string) => setEntityInfo(current => ({ ...current, [field.key]: value })),
+  }))]
+  const legacyRows = isCharacter ? [] : characterInfoRows.filter(row => row.key !== 'aliases' && row.value &&
+    !kindFields.some(field => field.legacy === row.key))
+
   const fieldLabelOf = (key: string): string =>
     key === 'nationality'
-      ? '国籍'
+      ? countryLabel
       : infoRows.find((row) => row.key === key)?.label ?? key
 
   const visibleInfoRows = infoRows.filter((row) => !hiddenFields.includes(row.key))
@@ -615,9 +611,20 @@ function CharacterEditorInner({
                 {visibleInfoRows.map(({ key, label, value, onChange }) => (
                   <div
                     key={key}
-                    className="group/field flex min-w-0 items-center gap-2 border-b border-line py-1.5"
+                    className={`group/field flex min-w-0 items-center gap-2 border-b border-line py-1.5 ${isCharacter && (key === 'weapon' || key === 'pet') ? 'sm:col-span-2' : ''}`}
                   >
                     <span className="w-[4.5rem] shrink-0 text-sm text-ink-muted">{label}</span>
+                    {isCharacter && (key === 'weapon' || key === 'pet') ? <div className="min-w-0 flex-1" data-equipment-selector={key}>
+                      <RelatedItemsSelector items={equipmentItems(key)} selectedIds={key === 'weapon' ? weaponIds : petIds}
+                        onChange={ids => handleRelatedKindChange(key, ids)}
+                        placeholder={key === 'weapon' ? '搜索武器词条...' : '搜索宠物词条...'}
+                        onNavigateItem={onNavigateToCharacter} />
+                      {unmatchedEquipmentText(extraInfo[key], allCharacters, key === 'weapon' ? weaponIds : petIds) ?
+                        <p className="mt-1 text-[10px] text-ink-faint">原填写：{unmatchedEquipmentText(extraInfo[key], allCharacters, key === 'weapon' ? weaponIds : petIds)}
+                          <button type="button" aria-label={key === 'weapon' ? '清除原武器描述' : '清除原宠物描述'} title="清除原填写内容"
+                            onClick={() => setExtraInfo(current => ({ ...current, [key]: '' }))} className="ml-1 text-ink-faint hover:text-ink">×</button>
+                        </p> : null}
+                    </div> : (
                     <input
                       type="text"
                       value={value}
@@ -625,6 +632,7 @@ function CharacterEditorInner({
                       placeholder={label}
                       className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
                     />
+                    )}
                     <button
                       type="button"
                       onClick={() => hideField(key)}
@@ -638,7 +646,7 @@ function CharacterEditorInner({
 
                 {!hiddenFields.includes('nationality') ? (
                   <div className="group/field flex min-w-0 items-center gap-2 border-b border-line py-1.5">
-                    <span className="w-[4.5rem] shrink-0 text-sm text-ink-muted">国籍</span>
+                    <span className="w-[4.5rem] shrink-0 text-sm text-ink-muted">{countryLabel}</span>
                     <div className="min-w-0 flex-1">
                       {countries.length > 0 ? (
                         <RelatedItemsSelector
@@ -654,7 +662,7 @@ function CharacterEditorInner({
                           type="text"
                           value={nationalityLegacy}
                           onChange={(e) => setNationalityLegacy(e.target.value)}
-                          placeholder="国籍"
+                          placeholder={countryLabel}
                           className="w-full bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
                         />
                       )}
@@ -662,7 +670,7 @@ function CharacterEditorInner({
                     <button
                       type="button"
                       onClick={() => hideField('nationality')}
-                      title="删除「国籍」字段"
+                      title={`删除「${countryLabel}」字段`}
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-ink-faint opacity-0 transition-opacity hover:text-error group-hover/field:opacity-100"
                     >
                       <X size={12} strokeWidth={2} />
@@ -671,10 +679,10 @@ function CharacterEditorInner({
                 ) : null}
               </div>
 
-              {hiddenFields.length > 0 ? (
+              {hiddenFields.some(key => key === 'nationality' || infoRows.some(row => row.key === key)) ? (
                 <div className="col-span-full flex flex-wrap items-center gap-1.5 border-t border-line pt-2">
                   <span className="text-[10px] text-ink-faint">已隐藏字段：</span>
-                  {hiddenFields.map((key) => (
+                  {hiddenFields.filter(key => key === 'nationality' || infoRows.some(row => row.key === key)).map((key) => (
                     <button
                       key={key}
                       type="button"
@@ -691,7 +699,7 @@ function CharacterEditorInner({
 
               <div className="flex gap-4 lg:flex-col">
                 <div className="w-28 shrink-0">
-                  <h4 className="mb-2 text-xs text-ink-muted">头像</h4>
+                  <h4 className="mb-2 text-xs text-ink-muted">{character.entityKind === 'weapon' ? '图片' : '头像'}</h4>
                   <ImageUploader
                     value={avatarUrl}
                     onChange={setAvatarUrl}
@@ -701,24 +709,25 @@ function CharacterEditorInner({
                     enableCrop
                     cropAspect={1}
                     shape="rect"
-                    placeholderText="上传头像"
+                    placeholderText={character.entityKind === 'weapon' ? '上传图片' : '上传头像'}
                   />
                   {avatarUrl ? (
                     <button
                       type="button"
-                      onClick={() => void downloadMedia(avatarUrl, `${name}-头像`, 'avatar')}
+                      onClick={() => void downloadMedia(avatarUrl, `${name}-${character.entityKind === 'weapon' ? '图片' : '头像'}`, 'avatar')}
                       className="mt-1.5 flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[10px] text-ink-muted hover:border-line-hover hover:text-ink"
                     >
                       <Download size={11} strokeWidth={2} />
-                      下载头像
+                      {character.entityKind === 'weapon' ? '下载图片' : '下载头像'}
                     </button>
                   ) : null}
                 </div>
                 <div className="min-w-0 flex-1 lg:max-w-[160px]">
-                  <h4 className="mb-2 text-xs text-ink-muted">立绘</h4>
+                  <h4 className="mb-2 text-xs text-ink-muted">{isCharacter ? '立绘' : '外观图'}</h4>
                   <div className="aspect-[9/16]">
                     <ImageGallery
                       mode="slider"
+                      placeholderText={isCharacter ? '点击上传立绘' : '点击上传外观图'}
                       images={avatarUrls}
                       enableCrop
                       cropAspect={9 / 16}
@@ -732,6 +741,13 @@ function CharacterEditorInner({
               </div>
             </div>
           </section>
+
+          {legacyRows.length ? <details className="rounded-lg border border-line p-3">
+            <summary className="cursor-pointer text-xs text-ink-muted">此前填写的信息</summary>
+            <div className="mt-2 grid gap-x-6 sm:grid-cols-2">{legacyRows.map(row => <label key={row.key} className="flex items-center gap-2 border-b border-line py-1.5 text-sm text-ink-muted">
+              <span className="w-[4.5rem] shrink-0">{row.label}</span><input aria-label={`此前的${row.label}`} value={row.value} onChange={event => row.onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-ink outline-none"/>
+            </label>)}</div>
+          </details> : null}
 
           {/* Extra user-defined fields */}
           <section>
@@ -902,12 +918,12 @@ function CharacterEditorInner({
           {/* Related Characters */}
           <section>
             <h3 className="text-base text-ink mb-3">
-              {kindLabel === '角色' ? '相关人物' : '关联角色'}
+              {isCharacter ? '相关人物' : character.entityKind === 'weapon' ? '持有者／关联角色' : '主人／关联角色'}
             </h3>
             <RelatedItemsSelector
               items={characterItems}
               selectedIds={relatedCharacterIds}
-              onChange={handleRelatedCharactersChange}
+              onChange={ids => handleRelatedKindChange('character', ids)}
               placeholder="搜索关联角色..."
               onNavigateItem={onNavigateToCharacter}
             />

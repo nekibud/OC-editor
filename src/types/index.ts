@@ -48,6 +48,7 @@ export interface Character {
   /** 复用角色模板的实体类型；旧数据没有该字段时按 character 处理。 */
   entityKind?: CharacterKind
   accentColor?: string
+  entityInfo?: Record<string, string>
   customFields?: CharacterCustomField[]
   /** 所属角色文件夹；null/undefined 表示未分类。文件夹元数据存于本地。 */
   folderId?: string | null

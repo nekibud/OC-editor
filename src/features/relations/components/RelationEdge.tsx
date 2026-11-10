@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getStraightPath, useReactFlow, type EdgeProps } from '@xyflow/react'
-import { Palette } from 'lucide-react'
 import { deleteRelation, updateRelationLabel } from '../services'
 import { useRelationUiStore } from '../store'
 import {
   resolveRelationArrow,
-  resolveRelationColor,
+  relationColorAppearance,
 } from '../style'
 import { useFloatingEdge } from './useFloatingEdge'
 
@@ -47,7 +46,7 @@ export function RelationEdge({
   const endX = anchors.targetX
   const endY = anchors.targetY
 
-  const color = resolveRelationColor(data?.color)
+  const { color, outline, labelBackground } = relationColorAppearance(data?.color)
   const arrow = resolveRelationArrow(data?.arrow)
 
   const dx = endX - startX
@@ -161,6 +160,9 @@ export function RelationEdge({
 
   return (
     <>
+      {outline ? (
+        <path d={edgePath} fill="none" stroke={outline} strokeWidth={3.6} style={{ pointerEvents: 'none' }} />
+      ) : null}
       <BaseEdge
         id={id ?? ''}
         path={edgePath}
@@ -175,6 +177,9 @@ export function RelationEdge({
             edgeStyle === 'straight' ? startY : c2y,
           )}
           fill={color}
+          stroke={outline}
+          strokeWidth={outline ? 1 : undefined}
+          strokeLinejoin="round"
           style={{ pointerEvents: 'none' }}
         />
       ) : null}
@@ -187,6 +192,9 @@ export function RelationEdge({
             edgeStyle === 'straight' ? endY : c1y,
           )}
           fill={color}
+          stroke={outline}
+          strokeWidth={outline ? 1 : undefined}
+          strokeLinejoin="round"
           style={{ pointerEvents: 'none' }}
         />
       ) : null}
@@ -232,7 +240,7 @@ export function RelationEdge({
                     setValue(String(data.relation ?? ''))
                   }
                 }}
-                style={{ color }}
+                style={{ color, backgroundColor: labelBackground }}
                 className="h-6 w-28 rounded border border-line-hover bg-paper px-1.5 text-center text-[10px] outline-none"
               />
             ) : (
@@ -250,25 +258,13 @@ export function RelationEdge({
                     }
                     setEditing(true)
                   }}
-                  title="点击编辑关系标签"
-                  style={{ color }}
+                  title="点击编辑关系标签与颜色"
+                  style={{ color, backgroundColor: labelBackground }}
                   className="cursor-text rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] whitespace-nowrap transition-colors hover:border-line-hover"
                 >
                   {(data.relation as string) || '相关'}
                 </button>
-                {onStyle ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onStyle(relationId || String(id ?? ''))
-                    }}
-                    title="设置箭头方向与颜色"
-                    className="flex h-5 w-5 items-center justify-center rounded text-ink-faint hover:bg-paper-card hover:text-ink"
-                  >
-                    <Palette size={11} strokeWidth={2} />
-                  </button>
-                ) : null}
+
                 <button
                   type="button"
                   onClick={(event) => {

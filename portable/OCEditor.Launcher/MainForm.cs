@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Text;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -51,6 +52,13 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
+        try
+        {
+            using var fonts = new InstalledFontCollection();
+            var names = fonts.Families.Select(font => font.Name).Distinct().OrderBy(name => name).ToArray();
+            File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "wwwroot", "local-fonts.json"), JsonSerializer.Serialize(names));
+        }
+        catch (Exception error) { LauncherLog.Write($"font catalog unavailable: {error.Message}"); }
         Text = "OC editor";
         var workArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
         Width = Math.Clamp((int)(workArea.Width * 0.92), 1100, Math.Max(1100, workArea.Width - 24));

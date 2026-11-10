@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, FileText, ImagePlus, Loader2, X } from 'lucide-react'
+import { Download, ImagePlus, Loader2, X } from 'lucide-react'
 import type { Novel, NovelExportOptions, NovelPageFormat } from './types'
 import { novelBackgroundDataUrl } from './background'
 import {
@@ -12,7 +12,8 @@ import {
   renderNovelPages,
   type NovelPageImage,
 } from './render'
-import { downloadNovelDocx } from './docx'
+import { selectNovelChapters } from './chapter-selection'
+import { NovelFileExports } from './NovelFileTools'
 
 interface NovelExportDialogProps {
   open: boolean
@@ -27,29 +28,34 @@ const FORMATS: Array<{ value: NovelPageFormat; label: string }> = [
 ]
 
 export function NovelExportDialog({ open, novel, onClose }: NovelExportDialogProps) {
+  return open ? <NovelExportContents key={novel.id} novel={novel} onClose={onClose}/> : null
+}
+
+function NovelExportContents({ novel, onClose }: Omit<NovelExportDialogProps, 'open'>) {
+  const [chapterIds, setChapterIds] = useState<Set<string> | null>(null)
+  const selectedNovel = useMemo(() => selectNovelChapters(novel, chapterIds), [novel, chapterIds])
+  const selectedCount = selectedNovel.chapters.length
   const [format, setFormat] = useState<NovelPageFormat>('9:16')
   const [scale, setScale] = useState(1)
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [pages, setPages] = useState<NovelPageImage[]>([])
   const [generating, setGenerating] = useState(false)
-  const [exportingDocx, setExportingDocx] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!open) return
     setPages([])
     setError('')
-  }, [open, format, scale, backgroundUrl])
+  }, [format, scale, backgroundUrl, selectedNovel])
 
-  if (!open) return null
 
   const generate = async (): Promise<void> => {
+    if (!selectedCount) return
     setGenerating(true)
     setError('')
     try {
       const options: NovelExportOptions = { format, scale, backgroundUrl: backgroundUrl || undefined }
-      const rendered = await renderNovelPages(novel, options)
+      const rendered = await renderNovelPages(selectedNovel, options)
       setPages(rendered)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '生成预览失败')
@@ -66,12 +72,13 @@ export function NovelExportDialog({ open, novel, onClose }: NovelExportDialogPro
   }
 
   const exportAll = async (): Promise<void> => {
+    if (!selectedCount) return
     let source = pages
     if (source.length === 0) {
       setGenerating(true)
       setError('')
       try {
-        source = await renderNovelPages(novel, {
+        source = await renderNovelPages(selectedNovel, {
           format,
           scale,
           backgroundUrl: backgroundUrl || undefined,
@@ -117,6 +124,19 @@ export function NovelExportDialog({ open, novel, onClose }: NovelExportDialogPro
 
         <div className="grid min-h-0 flex-1 md:grid-cols-[300px_minmax(0,1fr)]">
           <div className="space-y-5 overflow-y-auto border-b border-line p-5 md:border-b-0 md:border-r">
+            <section role="group" aria-label="导出章节">
+              <div className="mb-2 flex items-center justify-between text-xs text-ink-muted"><span>选择章节</span><span>已选 {selectedCount} / {novel.chapters.length} 章</span></div>
+              <div className="mb-2 flex gap-2">
+                <button type="button" disabled={generating} onClick={() => setChapterIds(null)} className="rounded border border-line px-2 py-1 text-[10px] text-ink-muted">全部选中</button>
+                <button type="button" disabled={generating} onClick={() => setChapterIds(new Set())} className="rounded border border-line px-2 py-1 text-[10px] text-ink-muted">全部取消</button>
+              </div>
+              <div className="novel-export-chapters">{novel.chapters.map((chapter, index) => <label key={chapter.id} className="flex items-start gap-2 py-1 text-xs text-ink-muted">
+                <input type="checkbox" disabled={generating} aria-label={`导出章节：${chapter.title}`} checked={chapterIds === null || chapterIds.has(chapter.id)}
+                  onChange={event => setChapterIds(current => { const next = new Set(current ?? novel.chapters.map(item => item.id)); if (event.target.checked) next.add(chapter.id); else next.delete(chapter.id); return next })}/>
+                <span>{index + 1}. {chapter.title || '未命名章节'}</span>
+              </label>)}</div>
+              {!selectedCount ? <p role="status" className="mt-2 text-[10px] text-ink-faint">请至少选择一个章节。</p> : null}
+            </section>
             <section>
               <p className="mb-2 text-xs font-medium text-ink-muted">页面尺寸</p>
               <div className="grid grid-cols-3 gap-1.5">
@@ -213,7 +233,7 @@ export function NovelExportDialog({ open, novel, onClose }: NovelExportDialogPro
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => void generate()}
-                disabled={generating}
+                disabled={generating || !selectedCount}
                 className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-ink px-3 text-sm text-paper hover:opacity-90 disabled:opacity-50"
               >
                 {generating ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -221,30 +241,14 @@ export function NovelExportDialog({ open, novel, onClose }: NovelExportDialogPro
               </button>
               <button
                 onClick={() => void exportAll()}
-                disabled={generating}
+                disabled={generating || !selectedCount}
                 className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm text-ink-muted hover:border-line-hover hover:text-ink disabled:opacity-40"
               >
                 <Download size={14} strokeWidth={2} />
                 导出全部图片页
               </button>
-              <button
-                onClick={async () => {
-                  setExportingDocx(true)
-                  setError('')
-                  try {
-                    await downloadNovelDocx(novel)
-                  } catch (cause) {
-                    setError(cause instanceof Error ? cause.message : '导出 Word 失败')
-                  } finally {
-                    setExportingDocx(false)
-                  }
-                }}
-                disabled={exportingDocx || generating}
-                className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-sm text-ink-muted hover:border-line-hover hover:text-ink disabled:opacity-40"
-              >
-                {exportingDocx ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} strokeWidth={2} />}
-                导出 Word (.docx)
-              </button>
+              <p className="text-[10px] leading-4 text-ink-faint">PNG 图片格式，保留此处预览的页面外观，每页一张图片。</p>
+              <NovelFileExports novel={selectedNovel} disabled={generating || !selectedCount} />
             </div>
             {error ? <p className="text-[11px] text-error">{error}</p> : null}
           </div>

@@ -8,8 +8,6 @@ import {
   ChevronUp,
   Eye,
   ImagePlus,
-  Italic,
-  Bold,
   Heading1,
   Heading2,
   Loader2,
@@ -26,6 +24,10 @@ import { EditorCore } from '@/components/editor/EditorCore'
 import { ImageUploader } from '@/components/shared/ImageUploader'
 import { getImageUrl } from '@/lib/image-service'
 import { AppConfirm } from '@/components/shared/AppConfirm'
+import { NovelNotesSidebar, NovelNotePanel } from './NovelNotes'
+import { NovelImportButton } from './NovelFileTools'
+import { NovelWritingTools } from './NovelWritingTools'
+import { novelFontCss } from './writing'
 import { useNovels } from './store'
 import { makeChapter, type Novel, type NovelChapter } from './types'
 import { NovelExportDialog } from './NovelExportDialog'
@@ -59,12 +61,20 @@ const STATUS_DOTS: Record<string, string> = {
 }
 
 export function NovelView() {
-  const { novels, loading, createNovel, updateNovel, deleteNovel } = useNovels()
+  const { novels, loading, createNovel, updateNovel, deleteNovel, importNovel } = useNovels()
   const { activeItem } = useNavigation()
   const { setWordCount, setWordCountLabel } = useWordCount()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [activeNote, setActiveNote] = useState<{ novelId: number; noteId: string } | null>(null)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const infoDialogRef = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = infoDialogRef.current
+    if (infoOpen && dialog && !dialog.open) dialog.showModal()
+    else if (!infoOpen && dialog?.open) dialog.close()
+  }, [infoOpen])
   const [pendingDeleteNovel, setPendingDeleteNovel] = useState<Novel | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -100,10 +110,14 @@ export function NovelView() {
     setChapterTitleDraft(activeChapter?.title ?? '')
   }, [activeChapter?.id, activeChapter?.title])
 
+  const previousMetadata = useRef<Pick<Novel, 'id' | 'title' | 'author' | 'synopsis'> | null>(null)
   useEffect(() => {
-    setTitleDraft(selected?.title ?? '')
-    setAuthorDraft(selected?.author ?? '')
-    setSynopsisDraft(selected?.synopsis ?? '')
+    const previous = previousMetadata.current
+    const changedNovel = previous?.id !== selected?.id
+    if (changedNovel || previous?.title !== selected?.title) setTitleDraft(selected?.title ?? '')
+    if (changedNovel || previous?.author !== selected?.author) setAuthorDraft(selected?.author ?? '')
+    if (changedNovel || previous?.synopsis !== selected?.synopsis) setSynopsisDraft(selected?.synopsis ?? '')
+    previousMetadata.current = { id: selected?.id, title: selected?.title ?? '', author: selected?.author ?? '', synopsis: selected?.synopsis ?? '' }
   }, [selected?.id, selected?.title, selected?.author, selected?.synopsis])
 
   useEffect(() => {
@@ -134,16 +148,6 @@ export function NovelView() {
   const saveChapters = (chapters: NovelChapter[]): void => {
     if (!selected?.id) return
     void updateNovel(selected.id, { chapters })
-  }
-
-  const noteItems = selected
-    ? (selected.noteItems ??
-      (selected.notes ? [{ id: 'legacy-note', text: selected.notes }] : []))
-    : []
-
-  const saveNotes = (items: Array<{ id: string; text: string }>): void => {
-    if (!selected?.id) return
-    void updateNovel(selected.id, { noteItems: items, notes: '' })
   }
 
   const selectedRef = useRef<Novel | null>(selected)
@@ -259,6 +263,11 @@ export function NovelView() {
             </button>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={() => { flushContent(); setInfoOpen(true) }}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+              title="作品信息" aria-label="作品信息">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5" /></svg>
+            </button>
             <button
               onClick={() => setFocusMode((value) => !value)}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
@@ -267,7 +276,7 @@ export function NovelView() {
               {focusMode ? <Minimize2 size={16} strokeWidth={2} /> : <Maximize2 size={16} strokeWidth={2} />}
             </button>
             <button
-              onClick={() => setExportOpen(true)}
+              onClick={() => { flushContent(); setExportOpen(true) }}
               className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs text-ink-muted hover:border-line-hover hover:text-ink"
             >
               <Eye size={14} strokeWidth={2} />
@@ -277,12 +286,13 @@ export function NovelView() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1">
+        <div className="novel-workspace flex min-h-0 flex-1">
           <aside
-            className={`w-[230px] shrink-0 overflow-y-auto border-r border-line bg-black/[0.015] p-3 dark:bg-white/[0.015] ${
+            className={`novel-sidebar w-[230px] shrink-0 border-r border-line bg-black/[0.015] p-3 dark:bg-white/[0.015] ${
               focusMode ? 'hidden' : 'max-md:hidden'
             }`}
           >
+            <section className="novel-chapters" aria-label="章节">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-widest text-ink-faint">章节</p>
               <button
@@ -293,7 +303,7 @@ export function NovelView() {
                 <Plus size={14} strokeWidth={2} />
               </button>
             </div>
-            <div className="space-y-1">
+            <div className="novel-chapter-list space-y-1">
               {selected.chapters.map((chapter, index) => (
                 <div
                   key={chapter.id}
@@ -352,146 +362,19 @@ export function NovelView() {
               ))}
             </div>
 
-            <div className="mt-6 space-y-3 border-t border-line pt-4">
-              <div>
-                <p className="mb-1 text-[10px] text-ink-faint">作者</p>
-                <input
-                  value={authorDraft}
-                  onChange={(event) => setAuthorDraft(event.target.value)}
-                  onBlur={() => {
-                    if (selected.id && authorDraft !== selected.author) {
-                      void updateNovel(selected.id, { author: authorDraft })
-                    }
-                  }}
-                  placeholder="作者名"
-                  className="h-7 w-full rounded border border-line bg-paper-card px-2 text-[11px] text-ink outline-none placeholder:text-ink-faint"
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] text-ink-faint">简介</p>
-                <textarea
-                  value={synopsisDraft}
-                  onChange={(event) => setSynopsisDraft(event.target.value)}
-                  onBlur={() => {
-                    if (selected.id && synopsisDraft !== selected.synopsis) {
-                      void updateNovel(selected.id, { synopsis: synopsisDraft })
-                    }
-                  }}
-                  placeholder="一句话介绍这个故事"
-                  rows={4}
-                  className="w-full resize-none rounded border border-line bg-paper-card px-2 py-1.5 text-[11px] leading-5 text-ink outline-none placeholder:text-ink-faint"
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] text-ink-faint">封面</p>
-                <ImageUploader
-                  value={selected.coverUrl}
-                  onChange={(path) => void updateNovel(selected.id!, { coverUrl: path })}
-                  onRemove={() => void updateNovel(selected.id!, { coverUrl: '' })}
-                  aspectRatio="3:4"
-                  size="sm"
-                  placeholderText="上传封面"
-                />
-              </div>
-
-              <div className="border-t border-line pt-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-ink-faint">全书字数</p>
-                  <p className="text-[10px] text-ink-muted">
-                    {totalWords}
-                    {targetWords > 0 ? ` / ${targetWords}` : ''}
-                  </p>
-                </div>
-                {targetWords > 0 ? (
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
-                    <div
-                      className="h-full rounded-full bg-[#b9975b] transition-[width]"
-                      style={{ width: `${goalPercent}%` }}
-                    />
-                  </div>
-                ) : null}
-                <label className="mt-3 block text-[10px] text-ink-faint">
-                  目标字数
-                  <input
-                    key={`${selected.id}-target`}
-                    type="number"
-                    min={0}
-                    defaultValue={selected.targetWords ?? ''}
-                    onBlur={(event) => {
-                      const value = Number(event.target.value)
-                      void updateNovel(selected.id!, {
-                        targetWords: Number.isFinite(value) && value > 0 ? Math.round(value) : 0,
-                      })
-                    }}
-                    placeholder="例如 100000"
-                    className="mt-1 h-7 w-full rounded border border-line bg-paper-card px-2 text-[11px] text-ink outline-none placeholder:text-ink-faint"
-                  />
-                </label>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] text-ink-faint">作品笔记</p>
-                  <button
-                    onClick={() =>
-                      saveNotes([
-                        ...noteItems,
-                        {
-                          id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-                          text: '',
-                        },
-                      ])
-                    }
-                    className="flex h-5 items-center gap-0.5 rounded px-1 text-[10px] text-ink-faint hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
-                    title="添加一条笔记"
-                  >
-                    <Plus size={11} strokeWidth={2} />
-                    添加
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {noteItems.map((note) => (
-                    <div key={note.id} className="group relative">
-                      <textarea
-                        key={`${selected.id}-${note.id}`}
-                        defaultValue={note.text}
-                        onBlur={(event) =>
-                          saveNotes(
-                            noteItems.map((item) =>
-                              item.id === note.id ? { ...item, text: event.target.value } : item,
-                            ),
-                          )
-                        }
-                        placeholder="记一条设定或灵感…"
-                        rows={2}
-                        className="w-full resize-none rounded-lg border border-line bg-paper-card px-2 py-1.5 pr-6 text-[11px] leading-5 text-ink outline-none placeholder:text-ink-faint"
-                      />
-                      <button
-                        onClick={() => saveNotes(noteItems.filter((item) => item.id !== note.id))}
-                        className="absolute right-1 top-1 hidden h-5 w-4 items-center justify-center text-ink-faint hover:text-error group-hover:flex"
-                        title="删除这条笔记"
-                      >
-                        <Trash2 size={11} strokeWidth={2} />
-                      </button>
-                    </div>
-                  ))}
-                  {noteItems.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[10px] leading-4 text-ink-faint">
-                      像备忘录一样，一条一条记录设定、灵感和待办。
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            </section>
+            <NovelNotesSidebar novel={selected} activeId={activeNote && activeNote.novelId === selected.id ? activeNote.noteId : null}
+              onSelect={noteId => setActiveNote({ novelId: selected.id!, noteId })}/>
           </aside>
 
-          <div className="min-w-0 flex-1 overflow-y-auto bg-black/[0.035] dark:bg-black/20">
+          {activeItem === '小说' && !focusMode && activeNote && activeNote.novelId === selected.id ? <NovelNotePanel novel={selected} activeId={activeNote.noteId} onClose={() => setActiveNote(null)}/> : null}
+          <div className="novel-editor-pane min-w-0 flex-1 overflow-y-auto bg-black/[0.035] dark:bg-black/20">
             {activeChapter ? (
               <div className="mx-auto w-full max-w-[880px] px-3 py-5 md:px-8 md:py-8">
                 <div className="mb-3 flex flex-wrap items-center gap-1 rounded-xl border border-line bg-paper/85 p-1.5 backdrop-blur">
+                  <NovelWritingTools key={selected.id} editor={novelEditor} fontFamily={selected.fontFamily}
+                    onFontChange={(fontFamily) => { if (selected.id) void updateNovel(selected.id, { fontFamily }) }} />
                   {[
-                    { icon: Bold, title: '加粗', action: () => novelEditor?.chain().focus().toggleBold().run() },
-                    { icon: Italic, title: '斜体', action: () => novelEditor?.chain().focus().toggleItalic().run() },
                     { icon: Heading1, title: '一级标题', action: () => novelEditor?.chain().focus().toggleHeading({ level: 1 }).run() },
                     { icon: Heading2, title: '二级标题', action: () => novelEditor?.chain().focus().toggleHeading({ level: 2 }).run() },
                     {
@@ -535,7 +418,7 @@ export function NovelView() {
                   </button>
                   <span className="ml-auto pr-1 text-[10px] text-ink-faint">正文编辑器</span>
                 </div>
-                <div className="novel-paper min-h-[72vh] rounded-sm bg-[#fbf7ee] px-6 py-9 text-[#3b3227] shadow-[0_18px_50px_rgba(20,15,10,0.16)] md:min-h-[86vh] md:px-16 md:py-14">
+                <div style={{ '--novel-body-font': novelFontCss(selected.fontFamily) } as React.CSSProperties} className="novel-paper min-h-[72vh] rounded-sm bg-[#fbf7ee] px-6 py-9 text-[#3b3227] shadow-[0_18px_50px_rgba(20,15,10,0.16)] md:min-h-[86vh] md:px-16 md:py-14">
                   <div className="flex items-start gap-2">
                     <input
                       value={chapterTitleDraft}
@@ -613,6 +496,7 @@ export function NovelView() {
                       key={activeChapter.id}
                       plain
                       hideBubbleMenu
+                      preserveWhitespace
                       hideContextMenu
                       content={activeChapter.content}
                       placeholder="从这一页开始写故事…"
@@ -629,6 +513,97 @@ export function NovelView() {
             )}
           </div>
         </div>
+
+        <dialog ref={infoDialogRef} className="novel-info-dialog rounded-xl border border-line bg-paper text-ink shadow-lg"
+          aria-labelledby="novel-info-title" onClose={() => setInfoOpen(false)}
+          onCancel={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() }}>
+          <div className="novel-info-header border-b border-line">
+            <h2 id="novel-info-title" className="font-serif text-lg">作品信息</h2>
+            <button type="button" autoFocus aria-label="关闭作品信息" title="关闭"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-black/5 dark:hover:bg-white/5"
+              onClick={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); infoDialogRef.current?.close() }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+          <div className="novel-info-content space-y-3">
+              <div>
+                <p className="mb-1 text-[10px] text-ink-faint">作者</p>
+                <input
+                  value={authorDraft}
+                  onChange={(event) => setAuthorDraft(event.target.value)}
+                  onBlur={() => {
+                    if (selected.id && authorDraft !== selected.author) {
+                      void updateNovel(selected.id, { author: authorDraft })
+                    }
+                  }}
+                  placeholder="作者名"
+                  className="h-7 w-full rounded border border-line bg-paper-card px-2 text-[11px] text-ink outline-none placeholder:text-ink-faint"
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] text-ink-faint">简介</p>
+                <textarea
+                  value={synopsisDraft}
+                  onChange={(event) => setSynopsisDraft(event.target.value)}
+                  onBlur={() => {
+                    if (selected.id && synopsisDraft !== selected.synopsis) {
+                      void updateNovel(selected.id, { synopsis: synopsisDraft })
+                    }
+                  }}
+                  placeholder="一句话介绍这个故事"
+                  rows={4}
+                  className="w-full resize-none rounded border border-line bg-paper-card px-2 py-1.5 text-[11px] leading-5 text-ink outline-none placeholder:text-ink-faint"
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] text-ink-faint">封面</p>
+                <ImageUploader
+                  value={selected.coverUrl}
+                  onChange={(path) => void updateNovel(selected.id!, { coverUrl: path })}
+                  onRemove={() => void updateNovel(selected.id!, { coverUrl: '' })}
+                  aspectRatio="3:4"
+                  size="sm"
+                  placeholderText="上传封面"
+                />
+              </div>
+
+              <div className="border-t border-line pt-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-ink-faint">全书字数</p>
+                  <p className="text-[10px] text-ink-muted">
+                    {totalWords}
+                    {targetWords > 0 ? ` / ${targetWords}` : ''}
+                  </p>
+                </div>
+                {targetWords > 0 ? (
+                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
+                    <div
+                      className="h-full rounded-full bg-[#b9975b] transition-[width]"
+                      style={{ width: `${goalPercent}%` }}
+                    />
+                  </div>
+                ) : null}
+                <label className="mt-3 block text-[10px] text-ink-faint">
+                  目标字数
+                  <input
+                    key={`${selected.id}-target`}
+                    type="number"
+                    min={0}
+                    defaultValue={selected.targetWords ?? ''}
+                    onBlur={(event) => {
+                      const value = Number(event.target.value)
+                      void updateNovel(selected.id!, {
+                        targetWords: Number.isFinite(value) && value > 0 ? Math.round(value) : 0,
+                      })
+                    }}
+                    placeholder="例如 100000"
+                    className="mt-1 h-7 w-full rounded border border-line bg-paper-card px-2 text-[11px] text-ink outline-none placeholder:text-ink-faint"
+                  />
+                </label>
+              </div>
+
+          </div>
+        </dialog>
 
         <NovelExportDialog
           open={exportOpen}
@@ -650,6 +625,8 @@ export function NovelView() {
               分章节写作、插入图片，并按 9:16、16:9 或 A4 导出小说页。
             </p>
           </div>
+          <div className="flex items-center gap-2">
+          <NovelImportButton onImport={async (book) => { const novel = await importNovel(book); openNovel(novel) }} />
           <button
             onClick={() => void handleCreate()}
             disabled={creating}
@@ -658,6 +635,7 @@ export function NovelView() {
             {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} strokeWidth={2} />}
             新建小说
           </button>
+          </div>
         </div>
 
         {novels.length === 0 ? (
