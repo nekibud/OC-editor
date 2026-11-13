@@ -1,9 +1,14 @@
 ## 下载
 
-**最新版：v0.20.1（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
+**最新版：v0.20.2（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
 
-- [便携版 OC-editor-0.20.1-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.20.1/OC-editor-0.20.1-portable-win64.zip) ← **推荐：解压即用，不需要安装**
-- [安装程序 OC-editor-0.20.1-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.20.1/OC-editor-0.20.1-Setup.exe)
+- [便携版 OC-editor-0.20.2-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.20.2/OC-editor-0.20.2-portable-win64.zip) ← **推荐：解压即用，不需要安装**
+- [安装程序 OC-editor-0.20.2-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.20.2/OC-editor-0.20.2-Setup.exe)
+- [微软商店 MSIX 包 OC-editor-0.20.2.msix](https://github.com/nekibud/OC-editor/releases/download/v0.20.2/OC-editor-0.20.2.msix)（Microsoft Store 提交用）
+
+> **0.20.2 修复**：从其他窗口切回时，IndexedDB 短暂读取失败会被误判成“没有世界观”；
+> 现在会自动重试 3 次，失败时显示「重试读取」而不是空的新建页，并在空状态警告先不要新建。
+> 这是本次「数据突然不见」的直接修复——旧数据通常仍在「默认世界观」里。
 
 > **0.20.1 修复**：全量备份「清空并导入」后旧关系残留；切换世界观后 active map
 > 可能返回上一世界地图；小说分页时非章节最后一页标题错误。三轮全功能回归通过。
@@ -29,7 +34,7 @@
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
-当前版本：**v0.20.1 · local-first**
+当前版本：**v0.20.2 · local-first**
 
 本仓库在原有角色 / 事件 / 国家 / 词条 / 时间线 / 关系图谱骨架上增量扩展，
 新增了**多世界观隔离**、**程序化世界地图生成器**与**可折叠树形表格**。运行时完全离线：无账号、无云同步、
