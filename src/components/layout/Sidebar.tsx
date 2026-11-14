@@ -20,6 +20,7 @@ import {
   PenLine,
   Sword,
   PawPrint,
+  Lightbulb,
 } from 'lucide-react'
 import { useNavigation } from './NavigationContext'
 import { useSettingsTrigger } from './SettingsTriggerContext'
@@ -114,6 +115,7 @@ const navItems = [
   { label: '世界观', icon: BookOpen },
   { label: '树表', icon: Table2 },
   { label: '小说', icon: PenLine },
+  { label: '灵感', icon: Lightbulb },
   { label: '地图生成器', icon: MapIcon },
   { label: '地图', icon: FolderOpen },
   { label: '时间线', icon: Clock },
@@ -176,10 +178,10 @@ export function Sidebar() {
           <WorldSwitcher variant="sidebar" />
         </div>
         <p className="px-2 pb-1 pt-1 text-[9px] uppercase tracking-widest text-ink-faint">创作</p>
-        {navItems.slice(0, 8).map(renderNavItem)}
+        {navItems.slice(0, 9).map(renderNavItem)}
 
         <p className="mt-2 px-2 pb-1 text-[9px] uppercase tracking-widest text-ink-faint">世界</p>
-        {navItems.slice(8).map(renderNavItem)}
+        {navItems.slice(9).map(renderNavItem)}
 
         <div className="mt-3 flex items-center gap-2 border-t border-line px-2 pb-1 pt-3">
           <Shapes size={12} strokeWidth={2} className="text-ink-faint" />

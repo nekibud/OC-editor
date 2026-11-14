@@ -4,6 +4,7 @@ export interface CharacterFormData {
   name: string
   entityKind?: CharacterKind
   accentColor?: string
+  entityInfo?: Record<string, string>
   customFields?: CharacterCustomField[]
   folderId?: string | null
   hiddenFields?: string[]

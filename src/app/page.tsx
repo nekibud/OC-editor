@@ -23,6 +23,7 @@ import { CountryEditor } from '@/features/countries/components/CountryEditor'
 import { useCreateCountry, useDeleteCountry } from '@/features/countries/hooks/useCountries'
 import { WorldLayout } from '@/features/world/components/WorldLayout'
 import { TimelineView } from '@/features/timeline/components/TimelineView'
+import { InspirationView } from '@/features/inspirations/InspirationView'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { NovelView } from '@/features/novel/NovelView'
 import { GlobalAlbum } from '@/components/shared/GlobalAlbum'
@@ -528,6 +529,7 @@ export default function Home() {
   const showCountries = activeItem === '国家'
   const showWorld = activeItem === '世界观'
   const showNovel = activeItem === '小说'
+  const showInspirations = activeItem === '灵感'
   const showTreeTable = activeItem === '树表'
   const showMapGenerator = activeItem === '地图生成器'
   const showMapManager = activeItem === '地图'
@@ -536,7 +538,7 @@ export default function Home() {
   const showAlbum = activeItem === '相册'
   const customSectionId = activeItem?.startsWith('custom:') ? activeItem.slice(7) : null
   const showCustomSection = customSectionId !== null
-  const showPlaceholder = activeItem !== null && !showEvents && !showCharacters && !showCountries && !showWorld && !showNovel && !showTreeTable && !showMapGenerator && !showMapManager && !showTimeline && !showRelations && !showAlbum && !showCustomSection
+  const showPlaceholder = activeItem !== null && !showEvents && !showCharacters && !showCountries && !showWorld && !showNovel && !showInspirations && !showTreeTable && !showMapGenerator && !showMapManager && !showTimeline && !showRelations && !showAlbum && !showCustomSection
   const placeholderText = activeItem !== null
     ? (PLACEHOLDER_MAP[activeItem] ?? '功能开发中...')
     : null
@@ -581,11 +583,11 @@ export default function Home() {
     } else if (showWorld) {
       setWordCountLabel('词条字数')
       setWordCount(worldCountRef.current)
-    } else if (!showNovel) {
+    } else if (!showNovel && !showInspirations) {
       setWordCountLabel('字数')
       setWordCount(0)
     }
-  }, [showEvents, showCharacters, showCountries, showWorld, showNovel, eventView, characterView, countryView, setWordCount, setWordCountLabel])
+  }, [showEvents, showCharacters, showCountries, showWorld, showNovel, showInspirations, eventView, characterView, countryView, setWordCount, setWordCountLabel])
 
   const { setNavigateHandler } = useEntityNavigate()
 
@@ -706,6 +708,9 @@ export default function Home() {
         data-visible={showNovel ? "true" : "false"}
       >
         <NovelView />
+      </div>
+      <div className="h-full section-fade overflow-hidden section-fade-no-gutter" data-visible={showInspirations ? 'true' : 'false'}>
+        <InspirationView />
       </div>
 
       <div

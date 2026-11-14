@@ -14,11 +14,13 @@ import {
   FolderPlus,
   FolderInput,
   MoreHorizontal,
+  ListChecks,
 } from 'lucide-react'
 import type { Character, CharacterKind } from '@/types'
 import { Avatar } from '@/components/shared/Avatar'
 import { DeleteButton } from '@/components/shared/DeleteButton'
 import { getImageUrl, resolveImageUrl } from '@/lib/image-service'
+import { characterCountry, countryColor } from '@/features/countries/colors'
 import { resolveAccentColor } from '@/lib/entity-accent'
 import { Separator } from '@/components/ui/separator'
 import { useCountryList } from '@/features/countries/hooks/useCountries'
@@ -57,8 +59,10 @@ import { MobileFab } from '@/components/layout/MobileFab'
 import {
   useCharacterFolders,
   moveCharactersToFolder,
+  loadCharacterFolders,
   type CharacterFolder,
 } from '../folders'
+import { CharacterFolderMoveDialog } from './CharacterFolderMoveDialog'
 
 type SortKey = 'name' | 'updatedAt' | 'createdAt' | 'manual'
 
@@ -242,19 +246,22 @@ function SortableCharacter({
   id,
   className,
   children,
+  disabled = false,
 }: {
   id: number
   className?: string
   children: React.ReactNode
+  disabled?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
+    disabled,
   })
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      {...(disabled ? {} : attributes)}
+      {...(disabled ? {} : listeners)}
       className={className}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -276,8 +283,12 @@ function CharacterCard({
   onMove,
   onLongPress,
   countryName,
+  countryAccent,
   isMobile,
   onReorder,
+  selecting = false,
+  selected = false,
+  onToggle,
 }: {
   character: Character
   onSelect: (id: number) => void
@@ -285,15 +296,20 @@ function CharacterCard({
   onMove?: () => void
   onLongPress?: () => void
   countryName?: string
+  countryAccent?: string
   isMobile: boolean
   onReorder?: (fromId: number, toId: number) => void
+  selecting?: boolean
+  selected?: boolean
+  onToggle?: () => void
 }) {
   const displayNationality = countryName || character.nationalityLegacy
-  const accent = resolveAccentColor(character.accentColor, character.name)
+  const kindDetail = character.entityKind === 'weapon' ? character.entityInfo?.type : character.entityKind === 'pet' ? (character.entityInfo?.species ?? character.race) : character.race
+  const accent = countryAccent ?? resolveAccentColor(character.accentColor, character.name)
 
   const longPress = useLongPress({
     onLongPress: onLongPress ?? (() => {}),
-    enabled: isMobile,
+    enabled: isMobile && !selecting,
   })
 
   return (
@@ -302,18 +318,22 @@ function CharacterCard({
       className="relative group touch-feedback"
       {...longPress}
     >
-      <span
+      {!selecting ? <span
         onClick={(event) => event.stopPropagation()}
         style={{ touchAction: 'none' }}
         className="absolute left-1 top-2 z-20 flex h-6 w-4 cursor-grab items-center justify-center rounded text-ink-faint opacity-0 transition-all hover:scale-125 hover:text-ink group-hover:opacity-100 active:scale-95"
         title="拖动调整位置"
       >
         <GripVertical size={13} strokeWidth={2} />
-      </span>
+      </span> : null}
+      {selecting ? <label className="absolute left-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded bg-paper/90" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+        <input type="checkbox" aria-label={`选择${character.name}`} checked={selected} onChange={onToggle} className="h-4 w-4"/>
+      </label> : null}
       <button
-        onClick={() => onSelect(character.id as number)}
+        onClick={() => selecting ? onToggle?.() : onSelect(character.id as number)}
+        aria-pressed={selecting ? selected : undefined}
         style={{ borderColor: `${accent}35` }}
-        className="flex w-full flex-col rounded-md border bg-paper-card overflow-hidden text-left transition-shadow hover:shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+        className={`flex w-full flex-col rounded-md border bg-paper-card overflow-hidden text-left transition-shadow hover:shadow-[0_1px_3px_rgba(0,0,0,0.03)] ${selected ? 'ring-1 ring-ink/40' : ''}`}
       >
         {character.headerUrl ? (
           <div className="relative w-full aspect-[3/2] bg-paper-card">
@@ -331,14 +351,14 @@ function CharacterCard({
             <div className="flex items-center gap-1 min-w-0">
               <h3 className="text-sm font-medium text-ink truncate">{character.name}</h3>
             </div>
-            {displayNationality ? (
-              <span className="text-xs text-ink-faint">{displayNationality}</span>
+            {displayNationality || kindDetail ? (
+              <span className="text-xs text-ink-faint">{[displayNationality, character.entityKind && character.entityKind !== 'character' ? kindDetail : ''].filter(Boolean).join(' · ')}</span>
             ) : null}
           </div>
         </div>
       </button>
 
-      {!isMobile ? (
+      {!isMobile && !selecting ? (
         <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           {onMove ? (
             <button
@@ -366,8 +386,12 @@ function CharacterRow({
   onMove,
   onLongPress,
   countryName,
+  countryAccent,
   isMobile,
   onReorder,
+  selecting = false,
+  selected = false,
+  onToggle,
 }: {
   character: Character
   onSelect: (id: number) => void
@@ -375,21 +399,27 @@ function CharacterRow({
   onMove?: () => void
   onLongPress?: () => void
   countryName?: string
+  countryAccent?: string
   isMobile: boolean
   onReorder?: (fromId: number, toId: number) => void
+  selecting?: boolean
+  selected?: boolean
+  onToggle?: () => void
 }) {
   const displayNationality = countryName || character.nationalityLegacy
+  const kindDetail = character.entityKind === 'weapon' ? character.entityInfo?.type : character.entityKind === 'pet' ? (character.entityInfo?.species ?? character.race) : character.race
   const aliasText = aliasesText(character.aliases)
-  const accent = resolveAccentColor(character.accentColor, character.name)
+  const accent = countryAccent ?? resolveAccentColor(character.accentColor, character.name)
 
   const longPress = useLongPress({
     onLongPress: onLongPress ?? (() => {}),
-    enabled: isMobile,
+    enabled: isMobile && !selecting,
   })
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      onSelect(character.id as number)
+      if (selecting) onToggle?.()
+      else onSelect(character.id as number)
     }
   }
 
@@ -397,22 +427,27 @@ function CharacterRow({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(character.id as number)}
+      onClick={() => selecting ? onToggle?.() : onSelect(character.id as number)}
+      aria-pressed={selecting ? selected : undefined}
       onKeyDown={handleKeyDown}
       data-character-id={character.id}
-      className="group relative flex w-full cursor-pointer items-center gap-3 rounded-md px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/8 dark:active:bg-white/8"
+      className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-md px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/8 dark:active:bg-white/8 ${selected ? 'bg-paper-card ring-1 ring-inset ring-ink/30' : ''}`}
       {...longPress}
     >
-      <span
+      {!selecting ? <span
         onClick={(event) => event.stopPropagation()}
         style={{ touchAction: 'none' }}
         className="absolute left-0 top-2 z-20 flex h-6 w-4 cursor-grab items-center justify-center rounded text-ink-faint opacity-0 transition-all hover:scale-125 hover:text-ink group-hover:opacity-100 active:scale-95"
         title="拖动调整位置"
       >
         <GripVertical size={13} strokeWidth={2} />
-      </span>
+      </span> : null}
+      {selecting ? <label className="flex h-6 w-6 shrink-0 items-center justify-center" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+        <input type="checkbox" aria-label={`选择${character.name}`} checked={selected} onChange={onToggle} className="h-4 w-4"/>
+      </label> : null}
       <span
         className="absolute bottom-2 left-2 top-2 w-0.5 rounded-full"
+        data-country-color={countryAccent}
         style={{ backgroundColor: accent }}
       />
       <Avatar src={getImageUrl(character.avatarUrl, 'avatar')} size="md" />
@@ -425,11 +460,11 @@ function CharacterRow({
         </div>
         <div className="truncate text-xs text-ink-muted">
           {displayNationality ? <span>{displayNationality}</span> : null}
-          {displayNationality && character.race ? <span> · </span> : null}
-          {character.race ? <span>{character.race}</span> : null}
+          {displayNationality && kindDetail ? <span> · </span> : null}
+          {kindDetail ? <span>{kindDetail}</span> : null}
         </div>
       </div>
-      {!isMobile ? (
+      {!isMobile && !selecting ? (
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           {onMove ? (
             <button
@@ -484,7 +519,11 @@ export function CharacterList({
   } | null>(null)
   const [folderMenu, setFolderMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<CharacterFolder | null>(null)
-  const [moveTarget, setMoveTarget] = useState<Character | null>(null)
+  const [moveTarget, setMoveTarget] = useState<Character[] | null>(null)
+  const [selection, setSelection] = useState<{ kind: CharacterKind; ids: Set<number> } | null>(null)
+  const selecting = selection?.kind === kind
+  const changeFolder = (folder: string): void => { setActiveFolder(folder); setSelection(null) }
+  const changeCountry = (country: number | 'all'): void => { setCountryFilter(country); setSelection(null) }
   const handleSelect = useMemo(() => withTouchFeedback(onSelectCharacter), [onSelectCharacter])
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     if (typeof window === 'undefined') return 'updatedAt'
@@ -507,7 +546,7 @@ export function CharacterList({
       title: char.name,
       actions: [
         { id: 'edit', label: '编辑', icon: <Pencil size={20} strokeWidth={2} />, onPress: () => onSelectCharacter(char.id as number) },
-        { id: 'move', label: '移动到文件夹', icon: <FolderInput size={20} strokeWidth={2} />, onPress: () => setMoveTarget(char) },
+        { id: 'move', label: '移动到文件夹', icon: <FolderInput size={20} strokeWidth={2} />, onPress: () => setMoveTarget([char]) },
         { id: 'delete', label: '删除', icon: <Trash2 size={20} strokeWidth={2} />, destructive: true, onPress: () => setDeleteTarget(char.id as number) },
       ],
     })
@@ -560,11 +599,22 @@ export function CharacterList({
           c.name.toLowerCase().includes(q) ||
           aliasesMatch(c.aliases, q) ||
           c.race?.toLowerCase().includes(q) ||
+          Object.values(c.entityInfo ?? {}).some(value => value.toLowerCase().includes(q)) ||
           c.nationalityLegacy?.toLowerCase().includes(q),
       )
     }
     return sortCharacters(result, sortKey, manualOrder)
-  }, [kindCharacters, sortKey, manualOrder, search, countryFilter, activeFolder, folders])
+  }, [kindCharacters, kind, sortKey, manualOrder, search, countryFilter, activeFolder, folders])
+  const selectedItems = selecting ? filtered.filter(item => item.id !== undefined && selection.ids.has(item.id)) : []
+  const selectedIds = new Set(selectedItems.map(item => item.id!))
+  const toggleSelection = (id: number): void => {
+    setSelection(current => {
+      const ids = new Set(current?.kind === kind ? current.ids : [])
+      if (ids.has(id)) ids.delete(id)
+      else ids.add(id)
+      return { kind, ids }
+    })
+  }
 
   const folderCounts = useMemo(() => {
     const knownFolderIds = new Set(folders.map((folder) => folder.id))
@@ -595,7 +645,7 @@ export function CharacterList({
     })
     setSortKey('manual')
     localStorage.setItem('oc-characters-sort', 'manual')
-  }, [kindCharacters])
+  }, [kindCharacters, setManualOrder, setSortKey])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -621,7 +671,7 @@ export function CharacterList({
     if (!name) return
     if (folderDialog.mode === 'create') {
       const folder = createFolder(name)
-      setActiveFolder(folder.id)
+      changeFolder(folder.id)
     } else if (folderDialog.id) {
       renameFolder(folderDialog.id, name)
     }
@@ -629,9 +679,11 @@ export function CharacterList({
   }
 
   const assignFolder = async (folderId: string | null): Promise<void> => {
-    if (!moveTarget || moveTarget.id === undefined) return
-    await moveCharactersToFolder([moveTarget.id], folderId)
+    if (!moveTarget?.length) return
+    if (folderId && !loadCharacterFolders().some(folder => folder.id === folderId)) throw new Error('目标文件夹已不存在，请重新选择。')
+    await moveCharactersToFolder(moveTarget.flatMap(item => item.id === undefined ? [] : [item.id]), folderId)
     setMoveTarget(null)
+    setSelection(null)
   }
 
   const confirmDeleteFolder = async (): Promise<void> => {
@@ -687,7 +739,7 @@ export function CharacterList({
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setSelection(null) }}
               placeholder={`搜索${kindLabel}...`}
               className="h-9 w-48 rounded border border-line bg-paper-card/60 pl-9 pr-3 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-line-hover focus:outline-none focus:bg-paper-card/80"
             />
@@ -697,7 +749,7 @@ export function CharacterList({
               <Separator orientation="vertical" className="max-md:hidden md:flex h-4 !self-center" />
               <CountryFilterSelect
                 value={countryFilter}
-                onChange={setCountryFilter}
+                onChange={changeCountry}
                 options={countryOptions}
               />
             </>
@@ -725,7 +777,7 @@ export function CharacterList({
           {kind === 'character' ? (
             <CountryFilterSelect
               value={countryFilter}
-              onChange={setCountryFilter}
+              onChange={changeCountry}
               options={countryOptions}
             />
           ) : null}
@@ -746,10 +798,11 @@ export function CharacterList({
 
       <div className="max-md:h-10 flex-shrink-0" />
 
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-4 py-2">
+      <div className="flex items-center border-b border-line">
+      <div data-folder-filters className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-4 py-2">
         <button
           type="button"
-          onClick={() => setActiveFolder('all')}
+          onClick={() => changeFolder('all')}
           className={`flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[11px] transition-colors ${
             activeFolder === 'all'
               ? 'border-line-hover bg-paper-card text-ink'
@@ -761,7 +814,7 @@ export function CharacterList({
         </button>
         <button
           type="button"
-          onClick={() => setActiveFolder('none')}
+          onClick={() => changeFolder('none')}
           className={`flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[11px] transition-colors ${
             activeFolder === 'none'
               ? 'border-line-hover bg-paper-card text-ink'
@@ -783,7 +836,7 @@ export function CharacterList({
           >
             <button
               type="button"
-              onClick={() => setActiveFolder(folder.id)}
+              onClick={() => changeFolder(folder.id)}
               className="flex h-full max-w-[160px] items-center gap-1 pl-2 text-[11px]"
               title={folder.name}
             >
@@ -814,6 +867,14 @@ export function CharacterList({
           新建文件夹
         </button>
       </div>
+      <button type="button" aria-pressed={selecting} onClick={() => setSelection(selecting ? null : { kind, ids: new Set() })} className="mx-3 flex h-7 shrink-0 items-center gap-1 rounded-md border border-line px-2 text-[11px] text-ink-muted hover:border-line-hover hover:text-ink"><ListChecks size={13}/>{selecting ? '完成' : '多选'}</button>
+      </div>
+      {selecting ? <div role="toolbar" aria-label={`批量整理${kindLabel}`} className="flex flex-wrap items-center gap-2 border-b border-line bg-paper-card/50 px-4 py-2">
+        <span role="status" className="mr-auto text-xs text-ink-muted">已选 {selectedItems.length} 个{kindLabel}</span>
+        <button type="button" disabled={!filtered.length} onClick={() => setSelection({ kind, ids: new Set(filtered.flatMap(item => item.id === undefined ? [] : [item.id])) })} className="h-7 rounded border border-line px-2 text-[11px] text-ink-muted disabled:opacity-40">全选当前列表</button>
+        <button type="button" disabled={!selectedItems.length} onClick={() => setSelection({ kind, ids: new Set() })} className="h-7 rounded border border-line px-2 text-[11px] text-ink-muted disabled:opacity-40">全部取消</button>
+        <button type="button" disabled={!selectedItems.length} onClick={() => setMoveTarget(selectedItems)} className="flex h-7 items-center gap-1 rounded bg-ink px-2 text-[11px] text-paper disabled:opacity-40"><FolderInput size={13}/>加入文件夹</button>
+      </div> : null}
 
       <div className="flex-1 p-4 flex flex-col">
         {kindCharacters.length === 0 ? (
@@ -857,15 +918,21 @@ export function CharacterList({
                     <SortableCharacter
                       key={character.id}
                       id={character.id as number}
+                      disabled={selecting}
                       className="[break-inside:avoid] mb-4"
                     >
                       <CharacterCard
                         character={character}
                         onSelect={handleSelect}
                         onDelete={onDeleteCharacter}
-                        onMove={() => setMoveTarget(character)}
+                        onMove={() => setMoveTarget([character])}
+                        selecting={selecting} selected={selectedIds.has(character.id!)} onToggle={() => toggleSelection(character.id!)}
                         onLongPress={() => openActionSheet(character)}
                         countryName={getCountryName(character)}
+                        countryAccent={(() => {
+                          const country = characterCountry(character, countries)
+                          return country ? countryColor(country) : undefined
+                        })()}
                         isMobile={isMobile}
                         onReorder={reorderCharacter}
                       />
@@ -883,15 +950,21 @@ export function CharacterList({
                     <SortableCharacter
                       key={character.id}
                       id={character.id as number}
+                      disabled={selecting}
                       className="border-b border-line last:border-0"
                     >
                       <CharacterRow
                         character={character}
                         onSelect={handleSelect}
                         onDelete={onDeleteCharacter}
-                        onMove={() => setMoveTarget(character)}
+                        onMove={() => setMoveTarget([character])}
+                        selecting={selecting} selected={selectedIds.has(character.id!)} onToggle={() => toggleSelection(character.id!)}
                         onLongPress={() => openActionSheet(character)}
                         countryName={getCountryName(character)}
+                        countryAccent={(() => {
+                          const country = characterCountry(character, countries)
+                          return country ? countryColor(country) : undefined
+                        })()}
                         isMobile={isMobile}
                         onReorder={reorderCharacter}
                       />
@@ -1048,75 +1121,8 @@ export function CharacterList({
           )
         : null}
 
-      {moveTarget
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm"
-              onClick={(event) => {
-                if (event.target === event.currentTarget) setMoveTarget(null)
-              }}
-            >
-              <div className="w-[340px] rounded-xl border border-line bg-paper p-4 shadow-xl">
-                <h3 className="font-serif text-base text-ink">
-                  移动「{moveTarget.name}」
-                </h3>
-                <p className="mt-1 text-[11px] text-ink-muted">选择目标文件夹</p>
-                <div className="mt-3 flex max-h-64 flex-col gap-1 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => void assignFolder(null)}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      !moveTarget.folderId
-                        ? 'border-line-hover bg-paper-card text-ink'
-                        : 'border-line text-ink-muted hover:border-line-hover hover:text-ink'
-                    }`}
-                  >
-                    <Folder size={14} strokeWidth={2} />
-                    未分类
-                  </button>
-                  {folders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      type="button"
-                      onClick={() => void assignFolder(folder.id)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                        moveTarget.folderId === folder.id
-                          ? 'border-line-hover bg-paper-card text-ink'
-                          : 'border-line text-ink-muted hover:border-line-hover hover:text-ink'
-                      }`}
-                    >
-                      <Folder size={14} strokeWidth={2} />
-                      <span className="truncate">{folder.name}</span>
-                    </button>
-                  ))}
-                  {folders.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMoveTarget(null)
-                        setFolderDialog({ mode: 'create', value: '' })
-                      }}
-                      className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-left text-sm text-ink-faint hover:border-line-hover hover:text-ink"
-                    >
-                      <FolderPlus size={14} strokeWidth={2} />
-                      新建文件夹
-                    </button>
-                  ) : null}
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setMoveTarget(null)}
-                    className="h-8 rounded-lg border border-line px-3 text-xs text-ink-muted hover:border-line-hover hover:text-ink"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {moveTarget ? <CharacterFolderMoveDialog targets={moveTarget} folders={folders} kindLabel={kindLabel}
+        onMove={assignFolder} onCreateFolder={createFolder} onClose={() => setMoveTarget(null)}/> : null}
     </div>
   )
 }

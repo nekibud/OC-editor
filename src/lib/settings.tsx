@@ -29,8 +29,12 @@ function loadSettings(): Settings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Settings>
-      return { ...DEFAULT_SETTINGS, ...parsed }
+      const parsed = JSON.parse(raw) as Partial<Settings> & { relationMouseMode?: string }
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        mouseMode: parsed.mouseMode ?? (parsed.relationMouseMode === 'modern' ? 'right-pan' : 'left-pan'),
+      }
     }
   } catch {
     // corrupted data, fall through

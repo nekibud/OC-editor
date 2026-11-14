@@ -16,6 +16,7 @@ interface ImageGalleryProps {
   columns?: number
   enableCrop?: boolean
   cropAspect?: number
+  placeholderText?: string
 }
 
 export function ImageGallery({
@@ -25,6 +26,7 @@ export function ImageGallery({
   onRemove,
   enableCrop = false,
   cropAspect,
+  placeholderText = '点击上传立绘',
 }: ImageGalleryProps) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [sliderIndex, setSliderIndex] = useState(0)
@@ -268,7 +270,7 @@ export function ImageGallery({
             className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-line bg-paper-card transition-colors hover:border-line-hover"
           >
             <ImageIcon size={24} strokeWidth={1.5} className="text-ink-faint" />
-            <span className="text-xs text-ink-faint">点击上传立绘</span>
+            <span className="text-xs text-ink-faint">{placeholderText}</span>
           </button>
         )}
         {images.length > 1 ? (

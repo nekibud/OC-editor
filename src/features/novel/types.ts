@@ -5,6 +5,9 @@ export type ChapterStatus = 'draft' | 'revising' | 'done'
 export interface NovelNote {
   id: string
   text: string
+  title?: string
+  content?: string
+  inspirationId?: string
 }
 
 export interface NovelChapter {
@@ -20,6 +23,7 @@ export interface Novel {
   /** 所属世界观；旧数据没有该字段时归入最早创建的世界观。 */
   worldId?: number
   title: string
+  fontFamily?: string
   author: string
   synopsis: string
   coverUrl?: string

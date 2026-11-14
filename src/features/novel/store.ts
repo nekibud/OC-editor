@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { liveQuery } from 'dexie'
 import Dexie, { type Table } from 'dexie'
 import type { Novel, NovelChapter } from './types'
+import type { ImportedNovel } from './transfer'
 import { makeChapter } from './types'
+import type { Inspiration } from '../inspirations/types'
 import {
   activeWorldIdForWrite,
   belongsToActiveWorld,
@@ -12,16 +14,19 @@ import {
 } from '@/lib/world-scope'
 
 // 数据库名沿用历史值：改名会变成新的空库，旧小说会“消失”。
-const novelDb = new Dexie('OCStudioNovels') as Dexie & {
+export const novelDb = new Dexie('OCStudioNovels') as Dexie & {
   novels: Table<Novel, number>
+  inspirations: Table<Inspiration, string>
 }
 
 novelDb.version(1).stores({
   novels: '++id,updatedAt',
 })
+novelDb.version(2).stores({ novels: '++id,updatedAt', inspirations: 'id,updatedAt' })
 
-novelDb.version(2).stores({
+novelDb.version(3).stores({
   novels: '++id,worldId,updatedAt',
+  inspirations: 'id,worldId,updatedAt',
 })
 
 export function useNovels(): {
@@ -29,6 +34,7 @@ export function useNovels(): {
   loading: boolean
   createNovel: (title?: string) => Promise<Novel>
   updateNovel: (id: number, patch: Partial<Novel>) => Promise<void>
+  importNovel: (novel: ImportedNovel) => Promise<Novel>
   deleteNovel: (id: number) => Promise<void>
 } {
   const [novels, setNovels] = useState<Novel[]>([])
@@ -77,7 +83,14 @@ export function useNovels(): {
     await novelDb.novels.delete(id)
   }, [])
 
-  return { novels, loading, createNovel, updateNovel, deleteNovel }
+  const importNovel = useCallback(async (book: ImportedNovel): Promise<Novel> => {
+    const now = Date.now()
+    const novel: Novel = { ...book, worldId: activeWorldIdForWrite(), createdAt: now, updatedAt: now }
+    const id = await novelDb.novels.add(novel)
+    return { ...novel, id }
+  }, [])
+
+  return { novels, loading, createNovel, updateNovel, deleteNovel, importNovel }
 }
 
 export function saveChapterContent(

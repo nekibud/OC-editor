@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { resolveImageUrl, getDefaultImage } from '@/lib/image-service'
 
 export interface AvatarProps {
@@ -8,6 +8,7 @@ export interface AvatarProps {
   alt?: string
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  style?: CSSProperties
   type?: 'avatar' | 'flag'
   shape?: 'circle' | 'square'
 }
@@ -18,7 +19,7 @@ const SIZE_MAP: Record<string, string> = {
   lg: 'w-16 h-16',
 }
 
-export function Avatar({ src, alt = '', size = 'md', className = '', type = 'avatar', shape = 'circle' }: AvatarProps) {
+export function Avatar({ src, alt = '', size = 'md', className = '', style, type = 'avatar', shape = 'circle' }: AvatarProps) {
   const [failedImgSrc, setFailedImgSrc] = useState<string | undefined>()
   const imgSrc = resolveImageUrl(src, type)
   const showImage = imgSrc && imgSrc !== failedImgSrc
@@ -26,6 +27,7 @@ export function Avatar({ src, alt = '', size = 'md', className = '', type = 'ava
 
   return (
     <div
+      style={style}
       className={`shrink-0 overflow-hidden border border-line ${rounded} ${SIZE_MAP[size]} ${className}`}
     >
       {showImage ? (

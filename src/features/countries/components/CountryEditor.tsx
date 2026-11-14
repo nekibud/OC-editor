@@ -15,6 +15,8 @@ import { Separator } from '@/components/ui/separator'
 import { RelatedItemsSelector } from '@/components/shared/RelatedItemsSelector'
 import type { RelatedItem } from '@/components/shared/RelatedItemsSelector'
 import { ProfileBannerEditor } from '@/components/shared/ProfileBannerEditor'
+import { countryColor } from '../colors'
+import { ColorPicker } from '@/components/shared/ColorPicker'
 import { CustomEntryLinks } from '@/components/shared/CustomEntryLinks'
 
 interface CountryEditorProps {
@@ -84,6 +86,7 @@ export function CountryEditor({
 
   return (
     <CountryEditorInner
+      key={country.id}
       country={country}
       allCharacters={allCharacters}
       allEvents={allEvents}
@@ -127,6 +130,7 @@ function CountryEditorInner({
   onWikiLinkClick?: (id: string) => void
 }) {
   const [name, setName] = useState(country.name)
+  const [accentColor, setAccentColor] = useState(() => countryColor(country))
   const [flagUrl, setFlagUrl] = useState(country.flagUrl ?? '')
   const [headerUrl, setHeaderUrl] = useState(country.headerUrl ?? '')
   const [saving, setSaving] = useState(false)
@@ -201,6 +205,7 @@ function CountryEditorInner({
 
       await onSaveRef.current(country.id as number, {
         name,
+        accentColor,
         parentId: country.parentId,
         description: '',
         document,
@@ -219,7 +224,7 @@ function CountryEditorInner({
     } finally {
       setSaving(false)
     }
-  }, [country.id, country.parentId, country.system, country.geography, country.culture, name, flagUrl, headerUrl, editableCharIds, editableEventIds, relatedNations, relatedNationLabels, relatedEventLabels, tags])
+  }, [country.id, country.parentId, country.system, country.geography, country.culture, name, accentColor, flagUrl, headerUrl, editableCharIds, editableEventIds, relatedNations, relatedNationLabels, relatedEventLabels, tags])
 
   useEffect(() => {
     if (skipInitialAutosaveRef.current) {
@@ -320,6 +325,14 @@ function CountryEditorInner({
               className="w-full bg-transparent text-xl text-ink placeholder:text-ink-faint focus:outline-none"
             />
           </div>
+
+          <Separator />
+
+          <section aria-label="国家代表色">
+            <h3 className="mb-2 text-base text-ink">国家代表色</h3>
+            <p className="mb-3 text-xs text-ink-muted">用于所属角色的头像圆环和列表标记。</p>
+            <ColorPicker label="国家颜色" value={accentColor} onChange={setAccentColor} />
+          </section>
 
           <Separator />
 

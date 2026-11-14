@@ -1,118 +1,14 @@
 'use client'
 
+import { zipFiles } from './archive'
 import { getImageUrl } from '@/lib/image-service'
 import type { Novel } from './types'
-import { parseNovelBlocks } from './render'
+import { parseNovelBlocks, type NovelRun } from './render'
 
 /* --------------------------------------------------------------------------
  * Minimal ZIP writer (stored entries, UTF-8 names). DOCX is a ZIP container,
  * so this keeps Word export dependency-free.
  * -------------------------------------------------------------------------- */
-
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256)
-  for (let i = 0; i < 256; i += 1) {
-    let c = i
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    table[i] = c >>> 0
-  }
-  return table
-})()
-
-function crc32(data: Uint8Array): number {
-  let crc = 0xffffffff
-  for (let i = 0; i < data.length; i += 1) {
-    crc = CRC_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8)
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-function u16(value: number): Uint8Array {
-  const out = new Uint8Array(2)
-  new DataView(out.buffer).setUint16(0, value, true)
-  return out
-}
-function u32(value: number): Uint8Array {
-  const out = new Uint8Array(4)
-  new DataView(out.buffer).setUint32(0, value >>> 0, true)
-  return out
-}
-function concat(parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((sum, part) => sum + part.length, 0)
-  const out = new Uint8Array(total)
-  let offset = 0
-  for (const part of parts) {
-    out.set(part, offset)
-    offset += part.length
-  }
-  return out
-}
-
-function zip(files: Array<{ name: string; data: Uint8Array }>): Blob {
-  const encoder = new TextEncoder()
-  const localParts: Uint8Array[] = []
-  const centralParts: Uint8Array[] = []
-  let offset = 0
-
-  for (const file of files) {
-    const name = encoder.encode(file.name)
-    const crc = crc32(file.data)
-    const local = concat([
-      u32(0x04034b50),
-      u16(20),
-      u16(0x0800),
-      u16(0),
-      u16(0),
-      u16(0),
-      u32(crc),
-      u32(file.data.length),
-      u32(file.data.length),
-      u16(name.length),
-      u16(0),
-      name,
-      file.data,
-    ])
-    localParts.push(local)
-    centralParts.push(
-      concat([
-        u32(0x02014b50),
-        u16(20),
-        u16(20),
-        u16(0x0800),
-        u16(0),
-        u16(0),
-        u16(0),
-        u32(crc),
-        u32(file.data.length),
-        u32(file.data.length),
-        u16(name.length),
-        u16(0),
-        u16(0),
-        u16(0),
-        u16(0),
-        u32(0),
-        u32(offset),
-        name,
-      ]),
-    )
-    offset += local.length
-  }
-
-  const central = concat(centralParts)
-  const end = concat([
-    u32(0x06054b50),
-    u16(0),
-    u16(0),
-    u16(files.length),
-    u16(files.length),
-    u32(central.length),
-    u32(offset),
-    u16(0),
-  ])
-  return new Blob([concat([...localParts, central, end]).buffer as ArrayBuffer], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  })
-}
 
 /* --------------------------------------------------------------------------
  * WordprocessingML
@@ -127,26 +23,20 @@ function escapeXml(value: string): string {
     .replace(/'/g, '&apos;')
 }
 
-function textParagraph(text: string, style?: string, indent = false): string {
+function textParagraph(text: string, style?: string, indent = false, runs?: NovelRun[]): string {
   const pPr = [
     style ? `<w:pStyle w:val="${style}"/>` : '',
     indent ? '<w:ind w:left="420" w:right="420"/>' : '',
   ].join('')
-  return `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`
+  const content = (runs?.length ? runs : [{ text }]).map((run) => {
+    const marks = `${run.bold ? '<w:b/>' : ''}${run.italic ? '<w:i/>' : ''}${run.underline ? '<w:u w:val="single"/>' : ''}${run.strike ? '<w:strike/>' : ''}`
+    return `<w:r>${marks ? `<w:rPr>${marks}</w:rPr>` : ''}${run.text.split(/(\n|\t)/).map(part => part === '\n' ? '<w:br/>' : part === '\t' ? '<w:tab/>' : `<w:t xml:space="preserve">${escapeXml(part)}</w:t>`).join('')}</w:r>`
+  }).join('')
+  return `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${content}</w:p>`
 }
 
 function pageBreak(): string {
   return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
-}
-
-function dataUrlToBytes(src: string): { bytes: Uint8Array; ext: string } | null {
-  const match = /^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/i.exec(src)
-  if (!match) return null
-  const raw = atob(match[2])
-  const bytes = new Uint8Array(raw.length)
-  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i)
-  const ext = match[1].toLowerCase().replace('jpg', 'jpeg')
-  return { bytes, ext }
 }
 
 function imageParagraph(
@@ -180,7 +70,7 @@ const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="SimSun" w:eastAsia="SimSun" w:hAnsi="SimSun"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:line="420" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="SimSun" w:eastAsia="SimSun" w:hAnsi="SimSun"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:line="480" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:before="2400" w:after="360"/></w:pPr><w:rPr><w:rFonts w:ascii="SimSun" w:eastAsia="SimSun"/><w:b/><w:sz w:val="56"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:color w:val="7A6650"/><w:sz w:val="24"/></w:rPr></w:style>
@@ -188,6 +78,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="300" w:after="120"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:right="720"/></w:pPr><w:rPr><w:color w:val="6B5B47"/><w:i/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="420"/></w:pPr></w:style>
+${[36, 30, 25].map((size, index) => `<w:style w:type="paragraph" w:styleId="BodyHeading${index + 1}"><w:name w:val="Body Heading ${index + 1}"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="360" w:after="180" w:line="336" w:lineRule="auto"/><w:outlineLvl w:val="${index + 1}"/></w:pPr><w:rPr><w:b/><w:sz w:val="${size}"/></w:rPr></w:style>`).join('')}
 </w:styles>`
 
 export async function buildNovelDocx(novel: Novel): Promise<Blob> {
@@ -235,12 +126,12 @@ export async function buildNovelDocx(novel: Novel): Promise<Blob> {
         }
         continue
       }
-      const text = block.text?.trim()
-      if (!text) continue
-      if (block.kind === 'heading') paragraphs.push(textParagraph(text, 'Heading2'))
-      else if (block.kind === 'quote') paragraphs.push(textParagraph(text, 'Quote', true))
-      else if (block.kind === 'list') paragraphs.push(textParagraph(`• ${text}`, 'ListParagraph'))
-      else paragraphs.push(textParagraph(text))
+      const text = block.text ?? ''
+      if (!text.trim() && block.kind !== 'paragraph') continue
+      if (block.kind === 'heading') paragraphs.push(textParagraph(text, `BodyHeading${block.headingLevel ?? 1}`, false, block.runs))
+      else if (block.kind === 'quote') paragraphs.push(textParagraph(text, 'Quote', true, block.runs))
+      else if (block.kind === 'list') paragraphs.push(textParagraph(`• ${text}`, 'ListParagraph', false, [{ text: '• ' }, ...(block.runs ?? [{ text }])]))
+      else paragraphs.push(textParagraph(text, undefined, false, block.runs))
     }
   }
 
@@ -255,14 +146,14 @@ ${rels.join('')}
 </Relationships>`
 
   const encoder = new TextEncoder()
-  return zip([
+  return zipFiles([
     { name: '[Content_Types].xml', data: encoder.encode(CONTENT_TYPES) },
     { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
     { name: 'word/document.xml', data: encoder.encode(document) },
-    { name: 'word/styles.xml', data: encoder.encode(STYLES) },
+    { name: 'word/styles.xml', data: encoder.encode(novel.fontFamily?.trim() ? STYLES.replaceAll('SimSun', escapeXml(novel.fontFamily.trim())) : STYLES) },
     { name: 'word/_rels/document.xml.rels', data: encoder.encode(documentRels) },
     ...media,
-  ])
+  ], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 }
 
 export async function downloadNovelDocx(novel: Novel): Promise<void> {
