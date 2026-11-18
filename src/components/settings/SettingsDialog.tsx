@@ -116,6 +116,7 @@ export function SettingsDialog({
     handleExport,
     handleExportZip,
     handleImportClick,
+    handleOcavImportClick,
     dialog: importExportDialog,
   } = useImportExport()
 
@@ -293,16 +294,26 @@ export function SettingsDialog({
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
+                    onClick={handleOcavImportClick}
+                    className="touch-feedback inline-flex items-center justify-center h-9 px-4 rounded text-sm border border-line bg-white/60 dark:bg-white/[0.06] text-ink transition-colors hover:border-line-hover hover:bg-white/40 dark:hover:bg-white/[0.10]"
+                  >
+                    导入 .ocbak 分类备份...
+                  </button>
+                  <p className="-mt-1 text-[11px] leading-4 text-ink-faint">
+                    支持角色、武器、宠物、事件、国家、世界观词条与自定义分类的 .ocbak 分类备份；
+                    会自动识别类型并同步关系图。
+                  </p>
+                  <button
                     onClick={handleImportClick}
                     className="touch-feedback inline-flex items-center justify-center h-9 px-4 rounded text-sm border border-line bg-white/60 dark:bg-white/[0.06] text-ink transition-colors hover:border-line-hover hover:bg-white/40 dark:hover:bg-white/[0.10]"
                   >
-                    导入 JSON / ZIP...
+                    导入 JSON / ZIP 备份...
                   </button>
                   <button
                     onClick={handleExport}
                     className="touch-feedback inline-flex items-center justify-center h-9 px-4 rounded text-sm border border-line bg-white/60 dark:bg-white/[0.06] text-ink transition-colors hover:border-line-hover hover:bg-white/40 dark:hover:bg-white/[0.10]"
                   >
-                    导出所有数据 (JSON)
+                    导出全量 .ocbak (JSON)
                   </button>
                   <button
                     onClick={handleExportZip}
@@ -312,7 +323,9 @@ export function SettingsDialog({
                     导出 ZIP 备份
                   </button>
                   <p className="text-xs text-ink-faint mt-1">
-                    备份包含角色、事件、国家、词条、关系、标签与地图参数/种子；图片二进制保留在本地数据目录。
+                    全量 .ocbak 包含所有角色、事件、国家、词条、关系、标签与地图参数/种子；
+                    单个分类（角色/武器/宠物/事件/国家/词条）仍从各列表右上角单独导出 .ocbak。
+                    图片二进制保留在本地数据目录。
                   </p>
                 </div>
                 <div className="flex items-start gap-2 rounded border border-line bg-paper-card/50 p-3 text-xs leading-5 text-ink-muted">
@@ -341,7 +354,7 @@ export function SettingsDialog({
                 <ul className="flex flex-col gap-2 text-xs text-ink-muted">
                   <li className="flex items-start gap-2">
                     <Lock size={12} strokeWidth={2} className="mt-0.5 shrink-0 text-ink-faint" />
-                    Tauri CSP 默认 <code className="font-mono text-[10px]">default-src 'self'</code>，禁止任意远程脚本与网络请求。
+                    Tauri CSP 默认 <code className="font-mono text-[10px]">default-src &apos;self&apos;</code>，禁止任意远程脚本与网络请求。
                   </li>
                   <li className="flex items-start gap-2">
                     <Lock size={12} strokeWidth={2} className="mt-0.5 shrink-0 text-ink-faint" />
@@ -368,7 +381,7 @@ export function SettingsDialog({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-ink">版本</span>
                   <span className="text-sm text-ink-muted font-mono">
-                    v0.19.1 · local-first
+                    v0.20.5 · local-first
                   </span>
                 </div>
                 <div className="rounded border border-line p-3 text-xs leading-5 text-ink-muted">

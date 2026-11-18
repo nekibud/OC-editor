@@ -18,7 +18,7 @@ import type { EventFormData } from '../types'
 import { useCharacterList } from '@/features/characters/hooks/useCharacters'
 import { useCountryList } from '@/features/countries/hooks/useCountries'
 import { useEventList } from '@/features/events/hooks/useEvents'
-import { parseTime, assembleTime, sanitizeYearInput } from '../utils'
+import { parseTime, assembleTime, sanitizeYearInput, expandYear, splitYearUnit, parseYear, YEAR_UNIT_OPTIONS, type YearUnit } from '../utils'
 
 interface EventEditorProps {
   event: Event
@@ -34,9 +34,11 @@ export function EventEditor({ event, onBack, onSave, onMentionClick, onNavigateI
   const [title, setTitle] = useState(event.title)
   const [headerUrl, setHeaderUrl] = useState(event.headerUrl ?? '')
   const [year, setYear] = useState('')
+  const [yearUnit, setYearUnit] = useState<YearUnit>('none')
   const [month, setMonth] = useState('')
   const [day, setDay] = useState('')
   const [endYear, setEndYear] = useState('')
+  const [endYearUnit, setEndYearUnit] = useState<YearUnit>('none')
   const [endMonth, setEndMonth] = useState('')
   const [endDay, setEndDay] = useState('')
   const [location, setLocation] = useState(event.location)
@@ -97,10 +99,16 @@ export function EventEditor({ event, onBack, onSave, onMentionClick, onNavigateI
   useEffect(() => {
     const t = parseTime(event.time)
     const et = parseTime(event.endTime ?? '')
-    setYear(t.year)
+    const startYearValue = parseYear(event.time)
+    const endYearValue = parseYear(event.endTime ?? '')
+    const start = splitYearUnit(startYearValue === null ? '' : String(startYearValue))
+    const end = splitYearUnit(endYearValue === null ? '' : String(endYearValue))
+    setYear(start.value)
+    setYearUnit(start.unit)
     setMonth(t.month)
     setDay(t.day)
-    setEndYear(et.year)
+    setEndYear(end.value)
+    setEndYearUnit(end.unit)
     setEndMonth(et.month)
     setEndDay(et.day)
   }, [event.time, event.endTime])
@@ -257,12 +265,14 @@ export function EventEditor({ event, onBack, onSave, onMentionClick, onNavigateI
             <div className="flex items-center gap-1">
               <span className="text-xs text-ink-faint w-8 shrink-0">开始</span>
               <Input inputMode="numeric" maxLength={6} value={year} onChange={(e) => setYear(sanitizeYearInput(e.target.value))} placeholder="年份" className="w-16" />
+              <select value={yearUnit} onChange={(e) => setYearUnit(e.target.value as YearUnit)} className="h-9 rounded border border-line bg-paper-card px-1 text-xs text-ink">{YEAR_UNIT_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
               <Input inputMode="numeric" maxLength={2} value={month} onChange={(e) => setMonth(e.target.value.replace(/[^\d]/g, ''))} placeholder="月" className="w-12" />
               <Input inputMode="numeric" maxLength={2} value={day} onChange={(e) => setDay(e.target.value.replace(/[^\d]/g, ''))} placeholder="日" className="w-12" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-ink-faint w-8 shrink-0">结束</span>
               <Input inputMode="numeric" maxLength={6} value={endYear} onChange={(e) => setEndYear(sanitizeYearInput(e.target.value))} placeholder="结束年" className="w-16" />
+              <select value={endYearUnit} onChange={(e) => setEndYearUnit(e.target.value as YearUnit)} className="h-9 rounded border border-line bg-paper-card px-1 text-xs text-ink">{YEAR_UNIT_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
               <Input inputMode="numeric" maxLength={2} value={endMonth} onChange={(e) => setEndMonth(e.target.value.replace(/[^\d]/g, ''))} placeholder="月" className="w-12" />
               <Input inputMode="numeric" maxLength={2} value={endDay} onChange={(e) => setEndDay(e.target.value.replace(/[^\d]/g, ''))} placeholder="日" className="w-12" />
             </div>
@@ -277,10 +287,12 @@ export function EventEditor({ event, onBack, onSave, onMentionClick, onNavigateI
           {/* Desktop: time inputs inline */}
           <div className="mt-3 max-md:hidden md:flex md:flex-wrap md:items-center md:gap-2">
             <Input inputMode="numeric" maxLength={6} value={year} onChange={(e) => setYear(sanitizeYearInput(e.target.value))} placeholder="年份" className="w-16" />
+              <select value={yearUnit} onChange={(e) => setYearUnit(e.target.value as YearUnit)} className="h-9 rounded border border-line bg-paper-card px-1 text-xs text-ink">{YEAR_UNIT_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
             <Input inputMode="numeric" maxLength={2} value={month} onChange={(e) => setMonth(e.target.value.replace(/[^\d]/g, ''))} placeholder="月" className="w-12" />
             <Input inputMode="numeric" maxLength={2} value={day} onChange={(e) => setDay(e.target.value.replace(/[^\d]/g, ''))} placeholder="日" className="w-12" />
             <span className="text-xs text-ink-faint">→</span>
             <Input inputMode="numeric" maxLength={6} value={endYear} onChange={(e) => setEndYear(sanitizeYearInput(e.target.value))} placeholder="结束年" className="w-16" />
+              <select value={endYearUnit} onChange={(e) => setEndYearUnit(e.target.value as YearUnit)} className="h-9 rounded border border-line bg-paper-card px-1 text-xs text-ink">{YEAR_UNIT_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
             <Input inputMode="numeric" maxLength={2} value={endMonth} onChange={(e) => setEndMonth(e.target.value.replace(/[^\d]/g, ''))} placeholder="月" className="w-12" />
             <Input inputMode="numeric" maxLength={2} value={endDay} onChange={(e) => setEndDay(e.target.value.replace(/[^\d]/g, ''))} placeholder="日" className="w-12" />
             <Separator orientation="vertical" className="h-4 !self-center" />

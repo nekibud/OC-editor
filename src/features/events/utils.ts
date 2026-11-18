@@ -7,10 +7,52 @@ export type SortKey = 'time' | 'updatedAt' | 'createdAt'
  * 时间轴按年绘制刻度，年份过大会让刻度/分桶数量爆炸导致页面卡死；
  * 这里统一在解析层夹紧，避免任意大的数字进入布局计算。
  */
-export const MAX_ABS_YEAR = 99999
+export const MAX_ABS_YEAR = 1_000_000_000_000
 
-/** 合法的年份输入：可选负号 + 最多 5 位数字。 */
-export const YEAR_INPUT_PATTERN = /^-?\d{0,5}$/
+/** 合法的年份输入：可选负号 + 最多 12 位数字（配合“万/亿”单位）。 */
+export const YEAR_INPUT_PATTERN = /^-?\d{0,12}$/
+
+export type YearUnit = 'none' | '万' | '亿'
+export const YEAR_UNIT_OPTIONS: Array<{ value: YearUnit; label: string; multiplier: number }> = [
+  { value: 'none', label: '年', multiplier: 1 },
+  { value: '万', label: '万年', multiplier: 10_000 },
+  { value: '亿', label: '亿年', multiplier: 100_000_000 },
+]
+
+export function yearUnitMultiplier(unit: YearUnit): number {
+  return YEAR_UNIT_OPTIONS.find((item) => item.value === unit)?.multiplier ?? 1
+}
+
+/** 把「1 + 万」展开成存储用的 10000；空值保持空。 */
+export function expandYear(value: string, unit: YearUnit): string {
+  if (!value || value === '-') return value
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return value
+  const expanded = Math.trunc(numeric * yearUnitMultiplier(unit))
+  return String(Math.max(-MAX_ABS_YEAR, Math.min(MAX_ABS_YEAR, expanded)))
+}
+
+/** 从已存储的年份推断最适合回显的单位；只在能整除时使用，避免丢精度。 */
+export function splitYearUnit(expanded: string): { value: string; unit: YearUnit } {
+  if (!expanded || expanded === '-') return { value: expanded, unit: 'none' }
+  const numeric = Number(expanded)
+  if (!Number.isFinite(numeric)) return { value: expanded, unit: 'none' }
+  for (const candidate of [YEAR_UNIT_OPTIONS[2], YEAR_UNIT_OPTIONS[1]]) {
+    if (candidate && numeric !== 0 && numeric % candidate.multiplier === 0) {
+      return { value: String(numeric / candidate.multiplier), unit: candidate.value }
+    }
+  }
+  return { value: expanded, unit: 'none' }
+}
+
+export function formatYearNumber(year: number): string {
+  if (!Number.isFinite(year)) return '0'
+  const absolute = Math.abs(year)
+  const trim = (value: number): string => String(Number(value.toFixed(2)))
+  if (absolute >= 100_000_000) return `${trim(year / 100_000_000)}亿`
+  if (absolute >= 10_000) return `${trim(year / 10_000)}万`
+  return String(Math.trunc(year))
+}
 
 export function clampYear(year: number): number {
   if (!Number.isFinite(year)) return 0
@@ -25,7 +67,7 @@ export function clampYear(year: number): number {
  */
 export function sanitizeYearInput(value: string): string {
   const negative = value.startsWith('-')
-  const digits = value.replace(/[^\d]/g, '').slice(0, MAX_ABS_YEAR.toString().length)
+  const digits = value.replace(/[^\d]/g, '').slice(0, 12)
   if (!digits) return negative ? '-' : ''
   return `${negative ? '-' : ''}${digits}`
 }
@@ -115,9 +157,9 @@ export function addOneYear(time: string): string {
 
 export function parseYear(time: string): number | null {
   if (!time) return null
-  const match = /^-?\d+/.exec(time)
+  const match = /^(-?\d+(?:\.\d+)?)\s*(亿|万)?/.exec(time.trim())
   if (!match) return null
-  const parsed = parseInt(match[0], 10)
+  const parsed = Number(match[1]) * (match[2] === '亿' ? 100_000_000 : match[2] === '万' ? 10_000 : 1)
   // 超长/超大的年份统一夹紧到支持区间，防止时间轴刻度数量爆炸。
   return clampYear(parsed)
 }
@@ -126,10 +168,10 @@ export function formatEventTime(time: string): string {
   if (!time) return '未设定时间'
 
   const { year, month, day } = parseTime(time)
-  const yearNum = parseInt(year, 10)
+  const yearNum = parseYear(time)
 
-  if (!year) return '未设定时间'
-  const yearLabel = yearNum < 0 ? `前${Math.abs(yearNum)}年` : `${yearNum}年`
+  if (!year || yearNum === null) return '未设定时间'
+  const yearLabel = yearNum < 0 ? `前${formatYearNumber(Math.abs(yearNum))}年` : `${formatYearNumber(yearNum)}年`
   if (month && day) {
     return `${yearLabel}${parseInt(month, 10)}月${parseInt(day, 10)}日`
   }

@@ -51,6 +51,7 @@ import {
 import { createCountry, deleteCountry, updateCountry } from '@/features/countries/services'
 import { createEvent, deleteEvent, updateEvent } from '@/features/events/services'
 import { MobileRelationControls, DesktopRelationPanel } from './MobileRelationControls'
+import { getActiveWorldId } from '@/lib/world-scope'
 
 const NODE_POSITIONS_KEY = 'oc-relation-node-positions'
 const SCOPED_EDGES_KEY = 'oc-relation-scoped-edges'
@@ -75,16 +76,30 @@ function saveScopedEdges(scope: string, edges: LocalScopedEdge[]): void {
   localStorage.setItem(`${SCOPED_EDGES_KEY}:${scope}`, JSON.stringify(edges))
 }
 
-function loadNodePositions(scope: string): Record<string, { x: number; y: number }> {
+function positionStorageKey(scope: string): string {
+  const worldId = getActiveWorldId()
+  return `${NODE_POSITIONS_KEY}:${worldId ?? 'legacy'}:${scope}`
+}
+
+function readNodePositions(scope: string): Record<string, { x: number; y: number }> {
   try {
-    const raw = localStorage.getItem(`${NODE_POSITIONS_KEY}:${scope}`)
-    if (raw) return JSON.parse(raw)
+    const raw = localStorage.getItem(positionStorageKey(scope))
+    if (raw) return JSON.parse(raw) as Record<string, { x: number; y: number }>
+    // 兼容 0.20.4 之前没有 worldId 的 key。
+    const legacy = localStorage.getItem(`${NODE_POSITIONS_KEY}:${scope}`)
+    if (legacy) return JSON.parse(legacy) as Record<string, { x: number; y: number }>
     if (scope === 'main') {
-      const legacy = localStorage.getItem(NODE_POSITIONS_KEY)
-      return legacy ? JSON.parse(legacy) : {}
+      const oldest = localStorage.getItem(NODE_POSITIONS_KEY)
+      if (oldest) return JSON.parse(oldest) as Record<string, { x: number; y: number }>
     }
     return {}
-  } catch { return {} }
+  } catch {
+    return {}
+  }
+}
+
+function loadNodePositions(scope: string): Record<string, { x: number; y: number }> {
+  return readNodePositions(scope)
 }
 
 function saveNodePositions(
@@ -92,8 +107,17 @@ function saveNodePositions(
   positions: Record<string, { x: number; y: number }>,
 ) {
   try {
-    localStorage.setItem(`${NODE_POSITIONS_KEY}:${scope}`, JSON.stringify(positions))
+    // 合并而不是覆盖：隐藏分类/筛选后，未显示的节点位置也要保留。
+    const next = { ...readNodePositions(scope), ...positions }
+    localStorage.setItem(positionStorageKey(scope), JSON.stringify(next))
   } catch { /* quota exceeded, ignore */ }
+}
+
+function clearNodePositions(scope: string): void {
+  try {
+    localStorage.removeItem(positionStorageKey(scope))
+    localStorage.removeItem(`${NODE_POSITIONS_KEY}:${scope}`)
+  } catch { /* ignore */ }
 }
 
 const LAYOUT_CELL_WIDTH = 200

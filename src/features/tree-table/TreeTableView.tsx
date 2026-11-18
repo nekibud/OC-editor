@@ -65,6 +65,35 @@ function byWorldOrder(a: WorldEntry, b: WorldEntry): number {
   return (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title, 'zh-CN')
 }
 
+/** 父级不存在/已删除/成环时退回根级，避免整棵树因为没有根而“消失”。 */
+function computeSafeParents(rows: Array<{ id?: number; parentId?: number | null; deleted?: boolean }>): Map<number, number | null> {
+  const byId = new Map(rows.filter((row) => row.id !== undefined).map((row) => [row.id as number, row]))
+  const safe = new Map<number, number | null>()
+  for (const row of rows) {
+    const id = row.id
+    if (id === undefined) continue
+    const parentId = row.parentId
+    if (parentId === null || parentId === undefined || parentId === id || !byId.has(parentId) || byId.get(parentId)?.deleted) {
+      safe.set(id, null)
+      continue
+    }
+    const seen = new Set<number>([id])
+    let cursor: number | null | undefined = parentId
+    let guard = 0
+    let cyclic = false
+    while (cursor !== null && cursor !== undefined) {
+      if (seen.has(cursor) || guard++ > rows.length) {
+        cyclic = true
+        break
+      }
+      seen.add(cursor)
+      cursor = byId.get(cursor)?.parentId
+    }
+    safe.set(id, cyclic ? null : parentId)
+  }
+  return safe
+}
+
 function formatDate(timestamp: number): string {
   try {
     return new Date(timestamp).toLocaleDateString('zh-CN', {
@@ -130,12 +159,10 @@ export function TreeTableView() {
   )
 
   const worldRows = useMemo<Row[]>(() => {
-    const ids = new Set(entries.map((entry) => entry.id as number))
+    const safeParent = computeSafeParents(entries)
     const children = new Map<number | null, WorldEntry[]>()
     for (const entry of entries) {
-      const parent = entry.parentId !== null && entry.parentId !== undefined && ids.has(entry.parentId)
-        ? entry.parentId
-        : null
+      const parent = safeParent.get(entry.id as number) ?? null
       const list = children.get(parent) ?? []
       list.push(entry)
       children.set(parent, list)
@@ -173,13 +200,10 @@ export function TreeTableView() {
   }, [entries, expanded, query, tagName])
 
   const countryRows = useMemo<Row[]>(() => {
-    const ids = new Set(countries.map((country) => country.id as number))
+    const safeParent = computeSafeParents(countries)
     const children = new Map<number | null, Country[]>()
     for (const country of countries) {
-      const parent =
-        country.parentId !== null && country.parentId !== undefined && ids.has(country.parentId)
-          ? country.parentId
-          : null
+      const parent = safeParent.get(country.id as number) ?? null
       const list = children.get(parent) ?? []
       list.push(country)
       children.set(parent, list)

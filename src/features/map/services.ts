@@ -41,7 +41,9 @@ export async function getActiveMap(): Promise<WorldMapRecord | undefined> {
   const id = getActiveMapId()
   if (id !== null) {
     const record = await db.maps.get(id)
-    if (record && !record.deleted) return record
+    // localStorage 里的 active map 是全局的；切换世界观后必须校验归属，
+    // 否则会返回上一个世界观的地图。
+    if (record && !record.deleted && belongsToActiveWorld(record)) return record
   }
   const maps = await getMapRecords()
   return maps[0]

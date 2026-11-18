@@ -9,20 +9,20 @@ import type { WorldEntry } from '@/types'
 import { useEntryList, useEntry, useCreateEntry, useDeleteEntry } from '../hooks/useWorldEntries'
 import { saveEntryContent, renameEntry, reorderEntries } from '../services'
 import { syncReferenceLabels } from '@/lib/reference-sync'
+import { parseDocumentValue } from '@/lib/document-format'
 import type { WorldFormData } from '../types'
 import { WorldTree } from './WorldTree'
 import { useMobilePageHeader } from '@/components/layout/MobilePageHeaderContext'
 import { useMobileNavigation } from '@/components/layout/MobileNavigationContext'
+import { OcavExportButton } from '@/components/shared/OcavExportButton'
+import { toast } from 'sonner'
+import { exportWorldEntriesOcav } from '@/lib/ocav'
 
 function parseEditorContent(content: string): object | string {
   if (!content) return ''
-  try {
-    const parsed = JSON.parse(content) as unknown
-    if (parsed && typeof parsed === 'object') return parsed as object
-    return content
-  } catch {
-    return content
-  }
+  const parsed = parseDocumentValue(content)
+  if (parsed) return parsed
+  return content
 }
 
 interface WorldLayoutProps {
@@ -189,6 +189,11 @@ export function WorldLayout({ onMentionClick, onCharacterCount, selectedEntryId,
     })
   }, [selectedEntryId, entries, flushSave])
 
+  const handleExportWorld = useCallback(async (): Promise<void> => {
+    const result = await exportWorldEntriesOcav()
+    toast.success(`已导出世界观：${result.name}`)
+  }, [])
+
   const handleEditorReady = useCallback((editor: Editor) => {
     editorRef.current = editor
     saveEnabledRef.current = false
@@ -253,6 +258,11 @@ export function WorldLayout({ onMentionClick, onCharacterCount, selectedEntryId,
           <h2 className="text-lg text-ink font-serif font-bold">世界观</h2>
         </div>
         <div className="flex items-center gap-1">
+          <OcavExportButton
+            actions={[{ id: 'world', label: '导出世界观', onSelect: handleExportWorld }]}
+            label="导出"
+            compact
+          />
           <button
             onClick={() => handleCreate(null, '新词条')}
             className="flex h-9 w-9 items-center justify-center rounded text-ink-muted transition-colors hover:text-ink hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/8 dark:active:bg-white/8"

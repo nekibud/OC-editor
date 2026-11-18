@@ -150,15 +150,72 @@ export async function deleteWorld(id: number): Promise<void> {
 }
 
 /**
+ * 找出仍然带着 worldId 的内容。用于“世界观行丢失/全部被软删除”时恢复作用域。
+ * 只读第一行，避免启动时扫描大库。
+ */
+async function findContentWorldId(): Promise<number | null> {
+  const tables = [db.characters, db.events, db.countries, db.worldEntries, db.periods, db.maps] as unknown as Array<{
+    filter: (fn: (row: { worldId?: number; deleted?: boolean }) => boolean) => { first: () => Promise<{ worldId?: number } | undefined> }
+  }>
+  for (const table of tables) {
+    const row = await table.filter((item) => !item.deleted).first()
+    if (row?.worldId !== undefined && row.worldId !== null) return row.worldId
+  }
+  return null
+}
+
+/**
+ * 世界观行丢失但内容还在时，不能把界面停在“暂无世界观”诱导用户新建。
+ * 先恢复被软删除的世界；再不行，就用内容里残留的 worldId 补一行。
+ */
+async function recoverWorldScope(): Promise<boolean> {
+  const all = await db.worlds.toArray()
+  const deleted = all.filter((world) => world.deleted && world.id !== undefined)
+  if (deleted.length > 0) {
+    const now = Date.now()
+    await Promise.all(
+      deleted.map((world) => db.worlds.update(world.id as number, { deleted: false, updatedAt: now })),
+    )
+    return true
+  }
+
+  const worldId = await findContentWorldId()
+  if (worldId === null) return false
+  const now = Date.now()
+  await db.worlds.add({
+    id: worldId,
+    name: '恢复的世界观',
+    description: '检测到已有角色/事件/地图等内容，但世界观记录丢失，已自动恢复。',
+    order: 0,
+    createdAt: now,
+    updatedAt: now,
+    deleted: false,
+  })
+  await claimUnscopedRecords(worldId)
+  return true
+}
+
+/**
  * 启动时确定作用域：加载世界观、校验上次选择、记录默认世界观。
- * 不自动替用户选中，由选择页决定进入哪个世界观。
+ * 正常情况由选择页决定进入哪个世界观；只有检测到“内容还在、世界观行丢了”
+ * 时才自动恢复并进入，避免用户误以为数据被清空后又新建一个空世界。
  */
 export async function resolveWorldScope(): Promise<{ worlds: World[]; active: World | null }> {
-  const worlds = await listWorlds()
+  let worlds = await listWorlds()
+  let recovered = false
+  if (worlds.length === 0) {
+    recovered = await recoverWorldScope()
+    if (recovered) worlds = await listWorlds()
+  }
+
   setLegacyWorldId(worlds[0]?.id ?? null)
   const storedId = getActiveWorldId()
-  const active = storedId === null ? null : worlds.find((world) => world.id === storedId) ?? null
-  if (storedId !== null && active === null) setActiveWorldId(null)
+  let active = storedId === null ? null : worlds.find((world) => world.id === storedId) ?? null
+  if (!active && recovered && worlds[0]?.id !== undefined) {
+    active = worlds[0]
+    setActiveWorldId(active.id as number)
+  }
+  if (storedId !== null && !active) setActiveWorldId(null)
   markWorldScopeReady()
   return { worlds, active }
 }

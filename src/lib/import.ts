@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getActiveWorldId, getLegacyWorldId } from '@/lib/world-scope'
+import { syncRelationsFromEntities } from '@/features/relations/services'
 import type { QueryClient } from '@tanstack/react-query'
 import type { Table } from 'dexie'
 
@@ -291,6 +292,8 @@ export async function importData(
     await db.worldEntries.clear()
     await db.tags.clear()
     await db.maps.clear()
+    // 关系表也必须清空；否则旧关系会指向已被清掉的角色/国家。
+    await db.relations.clear()
 
     await Promise.all([
       characters.length > 0 ? db.characters.bulkAdd(characters as never[]) : Promise.resolve(),
@@ -300,6 +303,13 @@ export async function importData(
       records.tags.length > 0 ? db.tags.bulkAdd(records.tags as never[]) : Promise.resolve(),
       mapRecords.length > 0 ? db.maps.bulkAdd(mapRecords as never[]) : Promise.resolve(),
     ])
+
+    // 备份里存的是实体上的关系投影，不是 relations 表；导入后重建一次，
+    // 让关系图立刻拿到新 ID 下的边。
+    await syncRelationsFromEntities()
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('oc-relations-changed'))
+    }
 
     const total =
       characters.length +
@@ -334,6 +344,11 @@ export async function importData(
     totalOverwritten += result.overwritten
   }
 
+  // 与 replace 分支保持一致：把合并后的实体投影同步成关系表。
+  await syncRelationsFromEntities()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('oc-relations-changed'))
+  }
   queryClient?.invalidateQueries()
 
   return { added: totalAdded, skipped: totalSkipped, overwritten: totalOverwritten }

@@ -56,7 +56,7 @@ function AppShellChrome({ settings, children }: { settings: ReturnType<typeof us
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { settings } = useSettings()
-  const { ready: worldsReady, activeWorld, error: worldsError } = useWorlds()
+  const { ready: worldsReady, worlds, activeWorld, error: worldsError, refresh: refreshWorlds } = useWorlds()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState("general")
 
@@ -197,14 +197,36 @@ export function AppShell({ children }: { children: ReactNode }) {
     )
   }
 
+  // 读取世界观失败时绝不能把空列表当成“没有世界观”让用户新建：
+  // WebView2 短暂挂起/IndexedDB 忙时会出现一次读取失败，旧数据其实还在。
+  if (worldsError && worlds.length === 0) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-paper p-6">
+        <div className="w-full max-w-md rounded-2xl border border-line bg-paper-card p-6 text-center shadow-sm">
+          <p className="font-serif text-lg text-ink">暂时读不到世界观列表</p>
+          <p className="mt-2 text-xs leading-5 text-ink-muted">
+            这是读取失败，不代表数据被删除。请不要新建世界观，先点“重试”。
+            如果重试后仍为空，再关闭软件、备份数据目录后重开。
+          </p>
+          <p className="mt-3 break-words rounded-lg bg-black/5 px-3 py-2 text-[11px] text-error dark:bg-white/5">
+            {worldsError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refreshWorlds()}
+            className="mt-4 h-9 rounded-lg bg-ink px-4 text-sm text-paper hover:opacity-90"
+          >
+            重试读取
+          </button>
+        </div>
+        <Toaster />
+      </div>
+    )
+  }
+
   if (!activeWorld) {
     return (
       <>
-        {worldsError ? (
-          <div className="fixed left-1/2 top-3 z-[150] -translate-x-1/2 rounded-lg border border-error/40 bg-paper px-3 py-1.5 text-xs text-error shadow-sm">
-            世界观加载失败：{worldsError}
-          </div>
-        ) : null}
         <WorldPicker mode="gate" />
         <Toaster />
       </>

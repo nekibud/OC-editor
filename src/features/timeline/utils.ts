@@ -1,5 +1,5 @@
 import type { TimelineEvent } from './types'
-import { clampYear } from '@/features/events/utils'
+import { clampYear, formatYearNumber } from '@/features/events/utils'
 
 export type TimelineDensity = 'year' | 'decade' | 'half-century' | 'century'
 
@@ -48,7 +48,7 @@ export function buildBuckets(
   const baseSize = density === 'decade' ? 10 : density === 'half-century' ? 50 : 100
   // 跨度极大时自动放大桶宽，桶的数量始终受 MAX_BUCKETS 限制。
   let bucketSize = baseSize
-  while (bucketSize < 1_000_000 && totalYears / bucketSize > MAX_BUCKETS) {
+  while (bucketSize < 1_000_000_000_000_000 && totalYears / bucketSize > MAX_BUCKETS) {
     bucketSize *= 10
   }
 
@@ -118,8 +118,8 @@ export function buildBuckets(
     buckets.push({
       label:
         density === 'century'
-          ? `${startYear}年 - ${endYear}年`
-          : `${startYear} - ${endYear}`,
+          ? `${formatYearNumber(startYear)}年 - ${formatYearNumber(endYear)}年`
+          : `${formatYearNumber(startYear)} - ${formatYearNumber(endYear)}`,
       startYear,
       endYear,
       events,
@@ -169,7 +169,7 @@ export function buildYearTicks(
   }
 
   let step = density === 'decade' ? 10 : density === 'half-century' ? 50 : 100
-  while (step < 1_000_000 && totalYears / step > MAX_TICKS) {
+  while (step < 1_000_000_000_000_000 && totalYears / step > MAX_TICKS) {
     step *= 10
   }
   const start =

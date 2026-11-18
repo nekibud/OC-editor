@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { filterByActiveWorld } from '@/lib/world-scope'
 import { createZip, downloadBlob } from '@/lib/zip'
+import { embedImagesDeep } from '@/lib/embed-assets'
 
 export interface ExportPayload {
   version: 2
@@ -34,6 +35,16 @@ export async function exportAllData(): Promise<ExportPayload> {
     db.worlds.filter((w) => !w.deleted).toArray(),
   ])
 
+  const embedded = await embedImagesDeep({
+    characters,
+    events,
+    countries,
+    worldEntries,
+    tags,
+    maps,
+    worlds,
+  })
+
   return {
     version: 2,
     exportedAt: new Date().toISOString(),
@@ -41,16 +52,16 @@ export async function exportAllData(): Promise<ExportPayload> {
       app: 'OC editor',
       format: 'oc-editor-backup',
       offline: true,
-      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'maps'],
+      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'maps', 'images'],
     },
     data: {
-      characters,
-      events,
-      countries,
-      worldEntries,
-      tags,
-      maps,
-      worlds,
+      characters: embedded.characters,
+      events: embedded.events,
+      countries: embedded.countries,
+      worldEntries: embedded.worldEntries,
+      tags: embedded.tags,
+      maps: embedded.maps,
+      worlds: embedded.worlds,
     },
   }
 }
@@ -85,7 +96,7 @@ export async function exportAllDataZip(): Promise<{ name: string; size: number }
     '',
     '恢复：在 OC editor 的“设置 → 数据”中选择“导入 JSON / ZIP...”，选择本文件即可。',
     '地图图层会在导入后按 seed + params 在本地重新计算，因此不需要携带数 MB 的原始图层。',
-    '图片二进制仍保存在本地数据目录，不包含在本备份中。',
+    '图片会尽量转成内嵌 data URL；如果本机无法读取某个本地路径，会保留原路径。',
     '',
     `导出时间：${data.exportedAt}`,
   ].join('\n')

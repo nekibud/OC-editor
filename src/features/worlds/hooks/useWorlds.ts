@@ -40,18 +40,29 @@ export function useWorlds(): WorldStore {
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async (): Promise<void> => {
-    try {
-      const { worlds: next, active } = await resolveWorldScope()
-      setWorlds(next)
-      setActiveId(active?.id ?? null)
-      setError(null)
-    } catch (cause) {
-      console.error('[useWorlds] 世界观加载失败', cause)
-      setError(cause instanceof Error ? cause.message : '世界观加载失败')
-    } finally {
-      setReady(true)
-      setLoading(false)
+    let lastError: unknown = null
+    // WebView2 从其他窗口切回时，IndexedDB 可能短暂处于恢复/锁定状态；
+    // 一次读取失败不能当成“没有世界观”，否则会诱导用户新建空世界。
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const { worlds: next, active } = await resolveWorldScope()
+        setWorlds(next)
+        setActiveId(active?.id ?? null)
+        setError(null)
+        setReady(true)
+        setLoading(false)
+        return
+      } catch (cause) {
+        lastError = cause
+        if (attempt < 2) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)))
+        }
+      }
     }
+    console.error('[useWorlds] 世界观加载失败', lastError)
+    setError(lastError instanceof Error ? lastError.message : '世界观加载失败')
+    setReady(true)
+    setLoading(false)
   }, [])
 
   useEffect(() => {

@@ -43,7 +43,7 @@ import { MobileFilterBar } from '@/components/layout/MobileFilterBar'
 import { PERIOD_COLORS } from '@/types'
 import { updateEventTime } from '../services'
 import type { TimelineFilter } from '../services'
-import { parseYear, addOneYear } from '@/features/events/utils'
+import { parseYear, addOneYear, formatYearNumber } from '@/features/events/utils'
 import {
   computeDensity,
   densityLabel,

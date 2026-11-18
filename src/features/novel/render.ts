@@ -247,19 +247,32 @@ export async function renderNovelPages(
     contentPageNumber += 1
     pages[pageIndex - 1].pageNumber = contentPageNumber
     pages[pageIndex - 1].isCover = false
+    pages[pageIndex - 1].title = chapter.title
 
     const newPage = (): void => {
       const canvas = ctx.canvas
+      // 页码使用更小的字体居中绘制，会覆盖当前正文的 font / fillStyle /
+      // textAlign。翻页后必须恢复这些状态，否则上一段落在新页顶部的剩余
+      // 文字会用页码字体绘制，并在页首留下大片空白（第三页固定出错）。
+      const savedFont = ctx.font
+      const savedFillStyle = ctx.fillStyle
+      const savedTextAlign = ctx.textAlign
+      const savedTextBaseline = ctx.textBaseline
       ctx.fillStyle = 'rgba(80, 64, 45, 0.65)'
       ctx.font = `${Math.round(bodySize * 0.7)}px ${fontFamily}`
       ctx.textAlign = 'center'
       ctx.fillText(String(contentPageNumber), width / 2, height - margin * 0.62)
       pages[pageIndex - 1].dataUrl = canvas.toDataURL('image/png')
       ctx = createPage()
+      ctx.font = savedFont
+      ctx.fillStyle = savedFillStyle
+      ctx.textAlign = savedTextAlign
+      ctx.textBaseline = savedTextBaseline
       pageIndex = pages.length
       contentPageNumber += 1
       pages[pageIndex - 1].pageNumber = contentPageNumber
       pages[pageIndex - 1].isCover = false
+      pages[pageIndex - 1].title = chapter.title
       y = contentTop
     }
 

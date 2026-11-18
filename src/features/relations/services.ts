@@ -560,6 +560,11 @@ function upsertCharacterProjection(
 }
 
 /** 把一条关系写回实体面板的投影字段；返回是否真的写库。 */
+export async function applyRelationProjection(relation: RelationRecord): Promise<boolean> {
+  return applyProjectionAdd(relation)
+}
+
+/** 把一条关系写回实体面板的投影字段；返回是否真的写库。 */
 async function applyProjectionAdd(relation: RelationRecord): Promise<boolean> {
   const { characters, countries, events } = await readEntities()
   const characterById = new Map(characters.map((item) => [item.id, item]))

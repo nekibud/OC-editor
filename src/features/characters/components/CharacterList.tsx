@@ -54,6 +54,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MobileFilterBar } from '@/components/layout/MobileFilterBar'
 import { MobileFab } from '@/components/layout/MobileFab'
+import { OcavExportButton, type OcavExportAction } from '@/components/shared/OcavExportButton'
+import { toast } from 'sonner'
+import { exportCharactersOcav } from '@/lib/ocav'
 import {
   useCharacterFolders,
   moveCharactersToFolder,
@@ -650,6 +653,61 @@ export function CharacterList({
     writeViewPreference(mode)
   }
 
+  const activeFolderName =
+    activeFolder !== 'all' && activeFolder !== 'none'
+      ? folders.find((folder) => folder.id === activeFolder)?.name
+      : undefined
+
+  const exportActions: OcavExportAction[] = [
+    {
+      id: 'all-characters',
+      label: '导出全部角色',
+      hint: '角色、武器、宠物一起导出，并携带关联关系',
+      onSelect: async () => {
+        const result = await exportCharactersOcav({ kind: 'all' })
+        toast.success(`已导出全部角色：${result.name}`)
+      },
+    },
+    {
+      id: 'current-kind',
+      label: `导出本分类（${kindLabel}）`,
+      hint: `只导出当前${kindLabel}分类，导入时自动识别为角色数据`,
+      onSelect: async () => {
+        const result = await exportCharactersOcav({ kind })
+        toast.success(`已导出${kindLabel}：${result.name}`)
+      },
+    },
+  ]
+  if (activeFolderName) {
+    exportActions.push({
+      id: 'current-folder',
+      label: `导出文件夹「${activeFolderName}」`,
+      hint: '只导出这个文件夹里的角色，关系仍会自动同步',
+      onSelect: async () => {
+        const result = await exportCharactersOcav({
+          kind,
+          folderId: activeFolder,
+          folderName: activeFolderName,
+        })
+        toast.success(`已导出文件夹：${result.name}`)
+      },
+    })
+  } else if (activeFolder === 'none') {
+    exportActions.push({
+      id: 'uncategorized',
+      label: '导出未分类角色',
+      hint: '只导出没有放进文件夹的角色',
+      onSelect: async () => {
+        const result = await exportCharactersOcav({
+          kind,
+          folderId: null,
+          folderName: '未分类',
+        })
+        toast.success(`已导出未分类角色：${result.name}`)
+      },
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -711,13 +769,16 @@ export function CharacterList({
             onViewModeChange={handleViewChange}
           />
         </div>
-        <button
-          onClick={createInActiveFolder}
-          className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={16} strokeWidth={2} />
-          <span>新建{kindLabel}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <OcavExportButton actions={exportActions} label="导出" />
+          <button
+            onClick={createInActiveFolder}
+            className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={16} strokeWidth={2} />
+            <span>新建{kindLabel}</span>
+          </button>
+        </div>
       </div>
 
       <MobileFilterBar>
@@ -735,13 +796,16 @@ export function CharacterList({
             options={SORT_OPTIONS}
           />
         </div>
-        <button
-          onClick={createInActiveFolder}
-          className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>新建</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <OcavExportButton actions={exportActions} label="导出" compact />
+          <button
+            onClick={createInActiveFolder}
+            className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={14} strokeWidth={2} />
+            <span>新建</span>
+          </button>
+        </div>
       </MobileFilterBar>
 
       <div className="max-md:h-10 flex-shrink-0" />

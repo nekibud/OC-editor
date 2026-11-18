@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { db } from '@/lib/db'
 import { syncReferenceLabels } from '@/lib/reference-sync'
+import { parseDocumentValue } from '@/lib/document-format'
 
 type EntityType = 'character' | 'event' | 'country' | 'worldEntry'
 
 export function useDocument(entityId: number, entityType: EntityType) {
-  const [document, setDocument] = useState<Record<string, unknown> | null>(null)
+  const [document, setDocument] = useState<unknown>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,12 +39,17 @@ export function useDocument(entityId: number, entityType: EntityType) {
           setError('记录不存在')
           return
         }
-        const doc = record.document as Record<string, unknown> | undefined
-        if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
+        // 旧版本可能把 JSON 存成字符串；必须解成对象再交给 Tiptap，
+        // 否则编辑器会把 JSON 当 HTML 文本，重启后格式全乱。
+        const doc = parseDocumentValue(record.document)
+        if (doc) {
           const synced = await syncReferenceLabels(doc)
           if (!cancelled) setDocument(synced)
+        } else if (typeof record.document === 'string' && record.document.trim()) {
+          // 历史版本可能存 HTML；交给 Tiptap 按 HTML 解析。
+          if (!cancelled) setDocument(record.document)
         } else {
-          if (!cancelled) setDocument(doc ?? null)
+          if (!cancelled) setDocument(null)
         }
       } catch (err) {
         if (!cancelled) {

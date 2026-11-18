@@ -246,7 +246,7 @@ internal sealed class MainForm : Form
                 {
                     Title = "保存文件",
                     FileName = suggested,
-                    Filter = "OC editor 文件 (*.zip;*.json;*.ocbak;*.ocmap;*.png;*.jpg;*.jpeg)|*.zip;*.json;*.ocbak;*.ocmap;*.png;*.jpg;*.jpeg|所有文件 (*.*)|*.*",
+                    Filter = "OC editor 文件 (*.ocbak;*.zip;*.json;*.ocmap;*.png;*.jpg;*.jpeg)|*.ocbak;*.zip;*.json;*.ocmap;*.png;*.jpg;*.jpeg|OC editor 分类备份 (*.ocbak)|*.ocbak|所有文件 (*.*)|*.*",
                     AddExtension = true,
                     OverwritePrompt = true,
                 };

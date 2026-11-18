@@ -136,6 +136,45 @@ export function useCharacterFolders(): CharacterFolderApi {
   return { folders, createFolder, renameFolder, deleteFolder, moveFolder }
 }
 
+/**
+ * .ocbak 导入：按名称对齐文件夹，缺失的按原顺序创建。
+ * 返回「文件里的 folder id → 本地 folder id」映射，供角色重新挂载。
+ */
+export function importCharacterFolders(
+  incoming: Array<{ id?: string; name?: string }>,
+): Map<string, string> {
+  const mapping = new Map<string, string>()
+  if (typeof window === 'undefined' || incoming.length === 0) return mapping
+
+  const current = loadCharacterFolders()
+  const byName = new Map(current.map((folder) => [folder.name.trim().toLowerCase(), folder]))
+  let changed = false
+
+  for (const item of incoming) {
+    const name = String(item.name ?? '').trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    const existing = byName.get(key)
+    if (existing) {
+      if (item.id) mapping.set(item.id, existing.id)
+      continue
+    }
+    const folder: CharacterFolder = {
+      id: makeId(),
+      name,
+      order: current.length > 0 ? Math.max(...current.map((row) => row.order)) + 1 : 0,
+      createdAt: Date.now(),
+    }
+    current.push(folder)
+    byName.set(key, folder)
+    if (item.id) mapping.set(item.id, folder.id)
+    changed = true
+  }
+
+  if (changed) saveCharacterFolders(current.map((folder, order) => ({ ...folder, order })))
+  return mapping
+}
+
 /** 把一批角色移动到文件夹；folderId 为 null 表示未分类。 */
 export async function moveCharactersToFolder(
   characterIds: number[],

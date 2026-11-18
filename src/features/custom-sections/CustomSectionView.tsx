@@ -13,6 +13,9 @@ import { CustomSectionGraph } from './CustomSectionGraph'
 import { AppConfirm } from '@/components/shared/AppConfirm'
 import { ProfileBannerEditor } from '@/components/shared/ProfileBannerEditor'
 import { ImageGallery } from '@/components/shared/ImageGallery'
+import { OcavExportButton } from '@/components/shared/OcavExportButton'
+import { toast } from 'sonner'
+import { exportCustomSectionOcav } from '@/lib/ocav'
 
 interface CustomSectionViewProps {
   sectionId: string
@@ -617,7 +620,19 @@ export function CustomSectionView({ sectionId, onDeleted }: CustomSectionViewPro
                   className="mt-2 h-8 w-full max-w-md rounded-lg border border-line bg-paper-card px-2 text-xs text-ink-muted outline-none placeholder:text-ink-faint"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <OcavExportButton
+                  actions={[{
+                    id: 'custom-section',
+                    label: `导出${section.name}`,
+                    onSelect: async () => {
+                      const result = await exportCustomSectionOcav(section.id)
+                      toast.success(`已导出分类：${result.name}`)
+                    },
+                  }]}
+                  label="导出"
+                  compact
+                />
                 <button
                   onClick={() => setShowGraph(true)}
                   className="flex h-8 items-center gap-1 rounded-lg border border-line px-2.5 text-xs text-ink-muted hover:border-line-hover hover:text-ink"

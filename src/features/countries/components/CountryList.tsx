@@ -29,6 +29,9 @@ import type { SortOption, ViewMode } from '@/components/shared/SortViewControls'
 import { useDevice } from '@/lib/use-device'
 import { MobileFilterBar } from '@/components/layout/MobileFilterBar'
 import { MobileFab } from '@/components/layout/MobileFab'
+import { OcavExportButton } from '@/components/shared/OcavExportButton'
+import { toast } from 'sonner'
+import { exportCountriesOcav } from '@/lib/ocav'
 
 function readViewPreference(): ViewMode {
   if (typeof window === 'undefined') return 'grid'
@@ -225,6 +228,11 @@ export function CountryList({
     writeViewPreference(mode)
   }
 
+  const handleExportCountries = async (): Promise<void> => {
+    const result = await exportCountriesOcav()
+    toast.success(`已导出国家：${result.name}`)
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -276,13 +284,19 @@ export function CountryList({
             onViewModeChange={handleViewChange}
           />
         </div>
-        <button
-          onClick={onCreateCountry}
-          className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={16} strokeWidth={2} />
-          <span>新建国家</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <OcavExportButton
+            actions={[{ id: 'countries', label: '导出国家', onSelect: handleExportCountries }]}
+            label="导出国家"
+          />
+          <button
+            onClick={onCreateCountry}
+            className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={16} strokeWidth={2} />
+            <span>新建国家</span>
+          </button>
+        </div>
       </div>
 
       <MobileFilterBar>
@@ -291,13 +305,20 @@ export function CountryList({
           onChange={(key) => setSortKey(key as CountrySortKey)}
           options={COUNTRY_SORT_OPTIONS}
         />
-        <button
-          onClick={onCreateCountry}
-          className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>新建</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <OcavExportButton
+            actions={[{ id: 'countries', label: '导出国家', onSelect: handleExportCountries }]}
+            label="导出"
+            compact
+          />
+          <button
+            onClick={onCreateCountry}
+            className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={14} strokeWidth={2} />
+            <span>新建</span>
+          </button>
+        </div>
       </MobileFilterBar>
 
       <div className="max-md:h-10 flex-shrink-0" />

@@ -267,6 +267,10 @@ export function WorldPicker({ mode = 'gate', onClose }: WorldPickerProps) {
               <p className="mt-1 text-xs text-ink-muted">
                 新建一个世界观作为容器，之后所有内容都会保存在它里面。
               </p>
+              <p className="mt-2 text-[11px] leading-5 text-warning">
+                如果之前编辑过角色/事件/地图，请先不要新建：这可能是读取失败。
+                先关闭软件重开，或回到“管理世界观”确认是否已有旧世界。
+              </p>
             </div>
           ) : (
             worlds.map((world) => (

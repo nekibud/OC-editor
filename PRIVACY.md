@@ -30,17 +30,18 @@ Tauri 生产构建的 CSP 以 `default-src 'self'` 为基线，仅允许：
 | 角色、事件、国家、词条、标签、关系、地图参数/种子 | 本机 IndexedDB（Dexie 管理；数据库名沿用 `OCStudioDB` 以兼容旧数据） |
 | 图片（桌面端） | Tauri `AppData/images/`，选择文件时复制到该目录，不引用外部 URL |
 | 图片（浏览器开发预览） | 当前会话的 `blob:`；刷新后不持久，仅用于开发 |
-| 导出备份 | 用户主动选择的下载位置；JSON 或 ZIP |
+| 导出备份 | 用户主动选择的下载位置；JSON、ZIP 或 .ocbak 分类文件 |
 
 ## 导入安全
 
-- 导入 JSON/ZIP 时，会递归清除图片字段中的 `http(s)` URL，只保留 `data:`、`blob:` 与本地相对路径。
+- 导入 JSON/ZIP/.ocbak 时，会递归清除图片字段中的 `http(s)` URL，只保留 `data:`、`blob:` 与本地相对路径。
+- .ocbak 会读取条目形状判断类型，并校验必填字段；即使文件头类型写错，也不会把角色写进国家表。
 - 运行时 `resolveImageUrl()` 也会把远程图片降级为本地占位图，CSP 同时禁止远程 `img-src`。
 - ZIP 读取支持 store/deflate；只解析顶层的 `oc-data.json`，不执行压缩包内任何脚本。
 
 ## 备份与恢复
 
-- “设置 → 数据”提供 JSON 与 ZIP 两种导出。
+- “设置 → 数据”提供 JSON、ZIP 与 .ocbak 分类导入/导出；各分类列表页也可直接导出 `.ocbak`。
 - 备份包含：角色、事件、国家、词条、标签、嵌入条目的关系，以及地图的 `seed + params`。
 - 地图原始图层不进入备份：相同 seed + 参数可在本机确定性重建相同地图，避免数 MB 的冗余数据。
 - 图片二进制目前不进入备份，仍保存在本机数据目录；迁移机器时需同时复制 AppData/images。

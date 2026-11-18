@@ -6,6 +6,7 @@ import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Paragraph from '@tiptap/extension-paragraph'
+import UnderlineExtension from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -356,6 +357,7 @@ export function EditorCore({
           return placeholder ?? '开始创作你的世界...'
         },
       }),
+      UnderlineExtension,
       TaskList, TaskItem.configure({ nested: true }),
       Table.configure({
         resizable: true,

@@ -727,3 +727,82 @@ export function useCustomSections(): {
     removeScopedEdge,
   }
 }
+
+/** 导出当前世界观下的全部分类（.ocbak 使用）。 */
+export function readVisibleCustomSections(): CustomSection[] {
+  return loadVisibleSections()
+}
+
+export type CustomSectionImportOutcome = 'added' | 'overwritten' | 'skipped'
+
+/**
+ * .ocbak 导入单个自定义分类。
+ * 以「同名分类」作为对齐依据；同名覆盖时保留本地分类 id，避免现有链接失效。
+ */
+export function importCustomSectionForOcav(
+  section: CustomSection,
+  strategy: 'skip' | 'overwrite' | 'keep-both',
+): CustomSectionImportOutcome {
+  if (typeof window === 'undefined') return 'skipped'
+  const activeWorldId = activeWorldIdForWrite()
+  if (activeWorldId === undefined) return 'skipped'
+
+  const current = loadCustomSections()
+  const nameKey = section.name.trim().toLowerCase()
+  const existing = current.find(
+    (item) => belongsToActiveWorld(item) && item.name.trim().toLowerCase() === nameKey,
+  )
+
+  if (existing && strategy === 'skip') return 'skipped'
+
+  const usedEntryIds = new Set(
+    current.flatMap((item) => item.entries.map((entry) => entry.id)),
+  )
+  const entryIdMap = new Map<string, string>()
+  const preparedEntries = section.entries.map((entry) => {
+    const nextId = usedEntryIds.has(entry.id) ? makeId('entry') : entry.id
+    entryIdMap.set(entry.id, nextId)
+    usedEntryIds.add(nextId)
+    return { ...entry, id: nextId }
+  })
+  const remapEntryId = (id: string): string => entryIdMap.get(id) ?? id
+  const preparedSection: CustomSection = {
+    ...section,
+    id: existing && strategy === 'overwrite' ? existing.id : section.id,
+    worldId: activeWorldId,
+    name: section.name.trim() || existing?.name || '新分类',
+    entries: preparedEntries.map((entry) => {
+      const relatedEntryIds = (entry.relatedEntryIds ?? [])
+        .map(remapEntryId)
+        .filter((id) => preparedEntries.some((candidate) => candidate.id === id))
+      const entryLinks: CustomEntry['entryLinks'] = {}
+      for (const [oldId, link] of Object.entries(entry.entryLinks ?? {})) {
+        const nextId = remapEntryId(oldId)
+        if (relatedEntryIds.includes(nextId)) entryLinks[nextId] = link
+      }
+      return { ...entry, relatedEntryIds, entryLinks }
+    }),
+    scopedEdges: (section.scopedEdges ?? [])
+      .map((edge) => ({ ...edge, source: remapEntryId(edge.source), target: remapEntryId(edge.target) }))
+      .filter(
+        (edge) =>
+          preparedEntries.some((entry) => entry.id === edge.source) &&
+          preparedEntries.some((entry) => entry.id === edge.target),
+      ),
+    relatedSectionIds: [],
+  }
+
+  if (existing && strategy === 'overwrite') {
+    const next = current.map((item) => (item.id === existing.id ? preparedSection : item))
+    saveCustomSections(next)
+    return 'overwritten'
+  }
+
+  const usedSectionIds = new Set(current.map((item) => item.id))
+  const nextSection: CustomSection = {
+    ...preparedSection,
+    id: usedSectionIds.has(preparedSection.id) ? makeId('custom') : preparedSection.id,
+  }
+  saveCustomSections([...current, nextSection])
+  return 'added'
+}

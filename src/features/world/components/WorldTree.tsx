@@ -66,19 +66,34 @@ function saveExpanded(ids: Set<number>) {
 
 function buildTree(entries: WorldEntry[]): TreeNode[] {
   const map = new Map<number, TreeNode>()
+  const byId = new Map(entries.map((entry) => [entry.id as number, entry]))
   const roots: TreeNode[] = []
   for (const entry of entries) {
     map.set(entry.id as number, { entry, children: [] })
   }
+  // 拖拽产生环时，环上的节点没有根，整个树会“消失”。这里把无效父级
+  // 和环统一当作根级展示，至少让用户能重新拖回去。
+  const safeParent = (entry: WorldEntry): number | null => {
+    const id = entry.id as number
+    const parentId = entry.parentId
+    if (parentId === null || parentId === undefined || parentId === id) return null
+    if (!byId.has(parentId) || byId.get(parentId)?.deleted) return null
+    const seen = new Set<number>([id])
+    let cursor: number | null | undefined = parentId
+    let guard = 0
+    while (cursor !== null && cursor !== undefined) {
+      if (seen.has(cursor) || guard++ > entries.length) return null
+      seen.add(cursor)
+      cursor = byId.get(cursor)?.parentId
+    }
+    return parentId
+  }
   for (const entry of entries) {
     const node = map.get(entry.id as number)!
-    if (entry.parentId !== null && entry.parentId !== undefined) {
-      const parent = map.get(entry.parentId)
-      if (parent) parent.children.push(node)
-      else roots.push(node)
-    } else {
-      roots.push(node)
-    }
+    const parentId = safeParent(entry)
+    const parent = parentId === null ? null : map.get(parentId)
+    if (parent) parent.children.push(node)
+    else roots.push(node)
   }
   const sort = (nodes: TreeNode[]) => {
     nodes.sort((a, b) => (a.entry.order ?? 0) - (b.entry.order ?? 0) || a.entry.title.localeCompare(b.entry.title, 'zh-Hans'))
@@ -86,6 +101,19 @@ function buildTree(entries: WorldEntry[]): TreeNode[] {
   }
   sort(roots)
   return roots
+}
+
+function isDescendant(candidateId: number, ancestorId: number, parentMap: Map<number, number | null>): boolean {
+  let cursor = parentMap.get(candidateId)
+  const seen = new Set<number>()
+  let guard = 0
+  while (cursor !== null && cursor !== undefined) {
+    if (cursor === ancestorId) return true
+    if (seen.has(cursor) || guard++ > parentMap.size) return false
+    seen.add(cursor)
+    cursor = parentMap.get(cursor)
+  }
+  return false
 }
 
 function computeReorder(
@@ -175,6 +203,7 @@ function SortableTreeItem({
   onSelect,
   onDelete,
   onRename,
+  onMoveToRoot,
   editingId,
   setEditingId,
   expandedIds,
@@ -188,6 +217,7 @@ function SortableTreeItem({
   onSelect: (id: number, entry: WorldEntry) => void
   onDelete: (id: number) => void
   onRename: (id: number, title: string) => void
+  onMoveToRoot: (id: number) => void
   editingId: number | null
   setEditingId: (id: number | null) => void
   expandedIds: Set<number>
@@ -248,13 +278,17 @@ function SortableTreeItem({
       label: '重命名',
       onClick: () => setEditingId(entryId),
     },
+    {
+      label: '移到根级',
+      onClick: () => onMoveToRoot(entryId),
+    },
     { separator: true, label: '', onClick: () => {} },
     {
       label: '删除',
       danger: true,
       onClick: () => onDelete(entryId),
     },
-  ], [entryId, setEditingId, onDelete])
+  ], [entryId, setEditingId, onDelete, onMoveToRoot])
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -332,6 +366,7 @@ function SortableTreeItem({
               onSelect={onSelect}
               onDelete={onDelete}
               onRename={onRename}
+              onMoveToRoot={onMoveToRoot}
               editingId={editingId}
               setEditingId={setEditingId}
               expandedIds={expandedIds}
@@ -363,6 +398,10 @@ export function WorldTree({
   })
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
+  const moveToRoot = useCallback((id: number) => {
+    const updates = computeReorder(entries, id, null, null)
+    if (updates.length > 0) onReorder(updates)
+  }, [entries, onReorder])
   const handleLongPress = useCallback((entryId: number, title: string) => {
     const entry = entries.find((e) => e.id === entryId)
     setActionSheet({
@@ -371,16 +410,18 @@ export function WorldTree({
       actions: [
         { id: 'edit', label: '编辑', icon: <Pencil size={20} strokeWidth={2} />, onPress: () => { if (entry) onSelect(entryId, entry) } },
         { id: 'rename', label: '重命名', icon: <FileText size={20} strokeWidth={2} />, onPress: () => setEditingId(entryId) },
+        { id: 'root', label: '移到根级', icon: <ChevronRight size={20} strokeWidth={2} />, onPress: () => moveToRoot(entryId) },
         { id: 'delete', label: '删除', icon: <Trash2 size={20} strokeWidth={2} />, destructive: true, onPress: () => setDeleteTarget(entryId) },
       ],
     })
-  }, [entries, onSelect, onDelete, setEditingId])
+  }, [entries, onSelect, onDelete, setEditingId, moveToRoot])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
 
   const tree = useMemo(() => buildTree(entries), [entries])
+
 
   const parentMap = useMemo(() => {
     const map = new Map<number, number | null>()
@@ -400,6 +441,9 @@ export function WorldTree({
       const draggedParent = parentMap.get(draggedId) ?? null
       const overParent = parentMap.get(overId) ?? null
 
+      // 不能把节点拖进自己的子树，否则 A→B→A 成环，整棵树会从根上消失。
+      if (isDescendant(overId, draggedId, parentMap)) return
+
       const INDENT_THRESHOLD = 20
       let newParentId: number | null = overParent
 
@@ -409,6 +453,9 @@ export function WorldTree({
         }
       } else if (delta.x < -INDENT_THRESHOLD && draggedParent !== null) {
         newParentId = parentMap.get(draggedParent) ?? null
+      }
+      if (newParentId !== null && (newParentId === draggedId || isDescendant(newParentId, draggedId, parentMap))) {
+        newParentId = null
       }
 
       const updates = computeReorder(entries, draggedId, newParentId, overId)
@@ -448,6 +495,7 @@ export function WorldTree({
                   onSelect={onSelect}
                   onDelete={onDelete}
                   onRename={onRename}
+                  onMoveToRoot={moveToRoot}
                   editingId={editingId}
                   setEditingId={setEditingId}
                   expandedIds={expandedIds}

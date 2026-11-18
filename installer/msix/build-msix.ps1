@@ -1,6 +1,6 @@
-param(
+﻿param(
     [string]$MakeAppx = "",
-    [string]$Version = "0.19.0",
+    [string]$Version = "0.20.5",
     [string]$Configuration = "Release"
 )
 
@@ -38,7 +38,8 @@ Copy-Item (Join-Path $PSScriptRoot "Assets") $layout -Recurse -Force
 
 # 清单里的版本号以参数为准，避免忘记改。
 $manifest = Get-Content (Join-Path $PSScriptRoot "AppxManifest.xml") -Raw -Encoding UTF8
-$manifest = $manifest -replace 'Version="\d+\.\d+\.\d+\.\d+"', "Version=`"$Version.0`""
+# 只替换 Identity 的四段式 Version，不能误伤 MinVersion/MaxVersionTested。
+$manifest = $manifest -replace '(?<!Min)Version="\d+\.\d+\.\d+\.\d+"', "Version=`"$Version.0`""
 [System.IO.File]::WriteAllText((Join-Path $layout "AppxManifest.xml"), $manifest, (New-Object System.Text.UTF8Encoding($false)))
 
 if (Test-Path $output) { Remove-Item $output -Force }

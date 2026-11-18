@@ -39,6 +39,9 @@ import type { SortOption, ViewMode } from '@/components/shared/SortViewControls'
 import { useDevice } from '@/lib/use-device'
 import { MobileFilterBar } from '@/components/layout/MobileFilterBar'
 import { MobileFab } from '@/components/layout/MobileFab'
+import { OcavExportButton } from '@/components/shared/OcavExportButton'
+import { toast } from 'sonner'
+import { exportEventsOcav } from '@/lib/ocav'
 
 const SORT_OPTIONS: SortOption[] = [
   { label: '按事件时间', value: 'time' },
@@ -238,6 +241,11 @@ export function EventList({
     writeViewPreference(mode)
   }
 
+  const handleExportEvents = async (): Promise<void> => {
+    const result = await exportEventsOcav()
+    toast.success(`已导出事件：${result.name}`)
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -289,13 +297,19 @@ export function EventList({
             onViewModeChange={handleViewChange}
           />
         </div>
-        <button
-          onClick={onCreateEvent}
-          className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={16} strokeWidth={2} />
-          <span>新建事件</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <OcavExportButton
+            actions={[{ id: 'events', label: '导出事件', onSelect: handleExportEvents }]}
+            label="导出事件"
+          />
+          <button
+            onClick={onCreateEvent}
+            className="touch-feedback flex h-9 items-center gap-1.5 rounded border border-line bg-paper-card/60 px-3 text-sm text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={16} strokeWidth={2} />
+            <span>新建事件</span>
+          </button>
+        </div>
       </div>
 
       <MobileFilterBar>
@@ -304,13 +318,20 @@ export function EventList({
           onChange={(key) => setSortKey(key as SortKey)}
           options={SORT_OPTIONS}
         />
-        <button
-          onClick={onCreateEvent}
-          className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>新建</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <OcavExportButton
+            actions={[{ id: 'events', label: '导出事件', onSelect: handleExportEvents }]}
+            label="导出"
+            compact
+          />
+          <button
+            onClick={onCreateEvent}
+            className="touch-feedback flex h-7 items-center gap-1 rounded border border-line bg-paper-card/60 px-2.5 text-[11px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          >
+            <Plus size={14} strokeWidth={2} />
+            <span>新建</span>
+          </button>
+        </div>
       </MobileFilterBar>
 
       <div className="max-md:h-10 flex-shrink-0" />
