@@ -5,6 +5,8 @@
 ![GitHub release](https://img.shields.io/github/v/release/nekibud/OC-editor?label=release)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-2F6FEB)
 ![license](https://img.shields.io/github/license/nekibud/OC-editor)
+[![GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-OCEditor-2F6FEB)](https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor)
+[![Publish Windows package](https://github.com/nekibud/OC-editor/actions/workflows/publish-package.yml/badge.svg)](https://github.com/nekibud/OC-editor/actions/workflows/publish-package.yml)
 
 ![OC editor 选择世界观](docs/screenshots/world-select.png)
 
