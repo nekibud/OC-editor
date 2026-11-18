@@ -81,3 +81,7 @@ Thumbs.db
 .opencode/
 opencode.json
 .claude/
+
+# WebView2 本地测试 profile（绝不提交）
+portable/webview*/
+portable/**/EBWebView/
