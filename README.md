@@ -1,10 +1,18 @@
 ## 下载
 
-**最新版：v0.20.3（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
+**最新版：v0.20.4（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
 
-- [便携版 OC-editor-0.20.3-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.20.3/OC-editor-0.20.3-portable-win64.zip) ← **推荐：解压即用，不需要安装**
-- [安装程序 OC-editor-0.20.3-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.20.3/OC-editor-0.20.3-Setup.exe)
-- [微软商店 MSIX 包 OC-editor-0.20.3.msix](https://github.com/nekibud/OC-editor/releases/download/v0.20.3/OC-editor-0.20.3.msix)（Microsoft Store 提交用）
+- [便携版 OC-editor-0.20.4-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.20.4/OC-editor-0.20.4-portable-win64.zip) ← **推荐：解压即用，不需要安装**
+- [安装程序 OC-editor-0.20.4-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.20.4/OC-editor-0.20.4-Setup.exe)
+- [微软商店 MSIX 包 OC-editor-0.20.4.msix](https://github.com/nekibud/OC-editor/releases/download/v0.20.4/OC-editor-0.20.4.msix)（Microsoft Store 提交用）
+
+> **0.20.4 修复**：
+> 1. 世界观词条拖拽到侧栏空白处会形成 A→B→A 的环，整棵树从根上消失；
+>    现在禁止拖进自己的子树，并在读取时自动把环/丢失父级修回根级，右键也可「移到根级」。
+> 2. 编辑内容重启后格式错乱：补回下划线 marks；旧版 JSON 字符串/双重编码文档会先解析成对象，
+>    不再被 Tiptap 当成 HTML 文本。
+> 3. `.ocbak` 分类/全量导出会把本地图片尽量转成内嵌 data URL，别人导入后能直接看到图片。
+> 4. 时间线支持「万 / 亿」单位，最大年份扩到 1 万亿，极端值不再被截断成错误年份。
 
 > **0.20.3 修复**：从其他窗口切回时，IndexedDB 短暂读取失败会被误判成“没有世界观”；
 > 现在会自动重试 3 次，失败时显示「重试读取」而不是空的新建页，并在空状态警告先不要新建。
@@ -35,7 +43,7 @@
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
-当前版本：**v0.20.3 · local-first**
+当前版本：**v0.20.4 · local-first**
 
 本仓库在原有角色 / 事件 / 国家 / 词条 / 时间线 / 关系图谱骨架上增量扩展，
 新增了**多世界观隔离**、**程序化世界地图生成器**与**可折叠树形表格**。运行时完全离线：无账号、无云同步、
