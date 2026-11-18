@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <PackageId>OCEditor</PackageId>
+    <Version>0.20.5</Version>
+    <Authors>nekibud</Authors>
+    <Company>nekibud</Company>
+    <Description>OC editor 0.20.5 Windows installer / portable package (MSIX + portable ZIP).</Description>
+    <PackageTags>oc-editor;windows;msix;portable;worldbuilding</PackageTags>
+    <PackageProjectUrl>https://github.com/nekibud/OC-editor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nekibud/OC-editor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../artifacts/OC-editor-0.20.5.msix" Pack="true" PackagePath="tools/" />
+    <None Include="../../artifacts/OC-editor-0.20.5-portable-win64.zip" Pack="true" PackagePath="tools/" />
+    <None Include="../../README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>

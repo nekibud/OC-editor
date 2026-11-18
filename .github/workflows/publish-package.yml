@@ -1,0 +1,38 @@
+name: Publish Windows package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Download release binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts
+          gh release download v0.20.5 --pattern "OC-editor-0.20.5.msix" --dir artifacts
+          gh release download v0.20.5 --pattern "OC-editor-0.20.5-portable-win64.zip" --dir artifacts
+
+      - name: Pack NuGet package
+        run: dotnet pack packaging/OCEditor.Package/OCEditor.Package.csproj -c Release -o package-output
+
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget push package-output/*.nupkg \
+            --source "https://nuget.pkg.github.com/nekibud/index.json" \
+            --api-key "${{ secrets.GITHUB_TOKEN }}" \
+            --skip-duplicate
