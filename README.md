@@ -1,3 +1,13 @@
+# OC editor
+
+本地优先的原创角色（OC）与世界观创作工作台 · Windows 10/11 · 完全离线。
+
+![GitHub release](https://img.shields.io/github/v/release/nekibud/OC-editor?label=release)
+![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-2F6FEB)
+![license](https://img.shields.io/github/license/nekibud/OC-editor)
+
+![OC editor 选择世界观](docs/screenshots/world-select.png)
+
 ## 下载
 
 **最新版：v0.20.5（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
@@ -5,6 +15,11 @@
 - [便携版 OC-editor-0.20.5-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.20.5/OC-editor-0.20.5-portable-win64.zip) ← **推荐：解压即用，不需要安装**
 - [安装程序 OC-editor-0.20.5-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.20.5/OC-editor-0.20.5-Setup.exe)
 - [微软商店 MSIX 包 OC-editor-0.20.5.msix](https://github.com/nekibud/OC-editor/releases/download/v0.20.5/OC-editor-0.20.5.msix)（Microsoft Store 提交用）
+
+**GitHub Packages**：`OCEditor` NuGet 包（内含 MSIX + 便携版 ZIP）  
+https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
+
+> GitHub Packages 不能直接托管 `.msix`，所以用 NuGet 包承载安装文件；普通用户优先用上面的 Release 下载。
 
 > **0.20.5 修复**：
 > 1. 世界观词条拖拽到侧栏空白处会形成 A→B→A 的环，整棵树从根上消失；
@@ -41,7 +56,7 @@
 > 请用便携版 zip 或新版 Setup（二者都不经过 Windows Installer）。
 
 ---
-# OC editor
+## 简介
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
@@ -142,6 +157,18 @@
 | Web | 浏览器开发模式，`npm run dev` |
 | Windows 桌面 | Tauri v2 打包，原生 Mica 半透明窗口效果 |
 | Android | Capacitor v8 封装（首期地图/树表按桌面优先） |
+
+### 系统要求
+
+- Windows 10 1809（10.0.17763）或更高 / Windows 11，64 位。
+- 需要 Microsoft Edge WebView2 Runtime（Windows 11 通常自带；Setup 会检测）。
+- 不需要联网；首次启动也不会下载任何资源。
+
+### 数据位置
+
+- 默认数据目录：`%LOCALAPPDATA%\OC editor\WebView2`。
+- 从 OC Studio 升级时，会从 `%LOCALAPPDATA%\OC Studio\WebView2` 复制一次，不会覆盖原数据。
+- 卸载程序只移除软件，不删除上面的数据目录；重要内容仍建议定期导出 `.ocbak` / ZIP。
 
 ---
 
