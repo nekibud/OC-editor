@@ -12,8 +12,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.20.5</Version>
-    <FileVersion>0.20.5.0</FileVersion>
+    <Version>0.20.6</Version>
+    <FileVersion>0.20.6.0</FileVersion>
     <AssemblyTitle>OC editor</AssemblyTitle>
     <Product>OC editor</Product>
     <Company>OC editor</Company>
