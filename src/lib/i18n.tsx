@@ -71,6 +71,13 @@ const DYNAMIC: Array<[RegExp, DynamicReplacement]> = [
   [/^已导入(.+)：(.+)$/, (match) => `Imported ${EN[match[1].trim()] ?? match[1].trim()}: ${match[2]}`],
   [/^导出本分类（(.+)）$/, (match) => `Export this category (${EN[match[1].trim()] ?? match[1].trim()})`],
   [/^新建(.+)文件夹$/, (match) => `New ${EN[match[1].trim()] ?? match[1].trim()} folder`],
+  [/^只导出当前(.+)分类，导入时自动识别为角色数据$/, (match) => `Export only the current ${EN[match[1].trim()] ?? match[1].trim()} category; imported as character data`],
+  [/^未分类中暂无(.+)$/, (match) => `No ${EN[match[1].trim()] ?? match[1].trim()} in Uncategorized`],
+  [/^这个文件夹里还没有(.+)$/, (match) => `No ${EN[match[1].trim()] ?? match[1].trim()} in this folder yet`],
+  [/^删除「(.+)」字段$/, 'Delete “$1” field'],
+  [/^已导出全部角色：(.+)$/, 'Exported all characters: $1'],
+  [/^已导出未分类角色：(.+)$/, 'Exported uncategorized characters: $1'],
+  [/^已导出文件夹：(.+)$/, 'Exported folder: $1'],
   [/^事件 #(\d+)$/, 'Event #$1'],
   [/^国家 #(\d+)$/, 'Country #$1'],
   [/^角色图片-(\d+)$/, 'Character image $1'],
@@ -89,8 +96,6 @@ const DYNAMIC: Array<[RegExp, DynamicReplacement]> = [
   [/^确定删除分类「(.+)」？其中的所有条目和关联关系都会删除，原人物、国家等内容不会受影响。$/, 'Delete category “$1”? All its entries and links will be deleted; characters and countries themselves will not be affected.'],
   [/^确定删除「(.+)」？$/, 'Delete “$1”?'],
   [/^搜索(.+)\.\.\.$/, 'Search $1...'],
-  [/^未分类中暂无(.+)$/, 'No $1 in Uncategorized'],
-  [/^这个文件夹里还没有(.+)$/, 'This folder has no $1 yet'],
   [/^新建(.+)文件夹$/, 'New $1 folder'],
 ]
 
