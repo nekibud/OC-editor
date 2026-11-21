@@ -200,47 +200,28 @@ function applyLanguage(): void {
 export function LanguageTranslator(): null {
   useEffect(() => {
     applyLanguage()
-    let editingField = false
+    let timer = 0
     const isField = (target: EventTarget | null): boolean => {
       const element = target instanceof Element ? target : null
       return Boolean(element?.closest('input, textarea, [contenteditable="true"]'))
     }
-    const onFocusIn = (event: FocusEvent): void => {
-      if (isField(event.target)) editingField = true
+    const refresh = (delay = 40): void => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        // 输入/改名期间绝不翻译，避免和 React 受控输入互相触发。
+        if (isField(document.activeElement) || getLocale() !== 'en') return
+        applyLanguage()
+      }, delay)
     }
-    const onFocusOut = (): void => {
-      window.setTimeout(() => {
-        editingField = isField(document.activeElement)
-        if (!editingField && getLocale() === 'en') applyLanguage()
-      }, 0)
-    }
-    document.addEventListener('focusin', onFocusIn)
-    document.addEventListener('focusout', onFocusOut)
-    const observer = new MutationObserver((mutations) => {
-      // 输入法/改名输入框获得焦点时不要改写 DOM，
-      // 否则翻译节点和 React 受控输入会互相触发，造成卡死。
-      if (editingField || getLocale() !== 'en') return
-      for (const mutation of mutations) {
-        if (mutation.type === 'characterData') {
-          translateTextNode(mutation.target as Text, 'en')
-        } else if (mutation.type === 'attributes') {
-          translateAttributes(mutation.target as Element, 'en')
-        } else {
-          for (const node of mutation.addedNodes) translateTree(node, 'en')
-        }
-      }
-    })
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: [...ATTRS],
-    })
+    const onFocusOut = (): void => refresh(0)
+    const onClick = (): void => refresh(80)
+    // 只在一轮交互后翻译一次，不再用 MutationObserver 持续改写 DOM。
+    document.addEventListener('click', onClick, true)
+    document.addEventListener('focusout', onFocusOut, true)
     return () => {
-      observer.disconnect()
-      document.removeEventListener('focusin', onFocusIn)
-      document.removeEventListener('focusout', onFocusOut)
+      window.clearTimeout(timer)
+      document.removeEventListener('click', onClick, true)
+      document.removeEventListener('focusout', onFocusOut, true)
     }
   }, [])
   return null
