@@ -113,6 +113,34 @@ function saveNodePositions(
   } catch { /* quota exceeded, ignore */ }
 }
 
+function viewportStorageKey(scope: string): string {
+  return `${NODE_POSITIONS_KEY}:viewport:${getActiveWorldId() ?? 'legacy'}:${scope}`
+}
+
+function readViewport(scope: string): { x: number; y: number; zoom: number } | null {
+  try {
+    const raw = localStorage.getItem(viewportStorageKey(scope))
+    if (!raw) return null
+    const value = JSON.parse(raw) as { x?: unknown; y?: unknown; zoom?: unknown }
+    if (typeof value.x !== 'number' || typeof value.y !== 'number' || typeof value.zoom !== 'number') return null
+    return { x: value.x, y: value.y, zoom: value.zoom }
+  } catch {
+    return null
+  }
+}
+
+function saveViewport(scope: string, viewport: { x: number; y: number; zoom: number }): void {
+  try {
+    localStorage.setItem(viewportStorageKey(scope), JSON.stringify(viewport))
+  } catch { /* ignore */ }
+}
+
+function clearViewport(scope: string): void {
+  try {
+    localStorage.removeItem(viewportStorageKey(scope))
+  } catch { /* ignore */ }
+}
+
 function clearNodePositions(scope: string): void {
   try {
     localStorage.removeItem(positionStorageKey(scope))
@@ -197,18 +225,27 @@ const edgeTypes = {
   customEdge: CustomEdge,
 }
 
-function FitViewOnLoad({ ready }: { ready: boolean }) {
-  const { fitView } = useReactFlow()
+function FitViewOnLoad({
+  ready,
+  restore,
+}: {
+  ready: boolean
+  restore: { x: number; y: number; zoom: number } | null
+}) {
+  const { fitView, setViewport } = useReactFlow()
   const called = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     if (ready && !called.current) {
-      timerRef.current = setTimeout(() => fitView({ padding: 0.3 }), 100)
+      timerRef.current = setTimeout(() => {
+        if (restore) void setViewport(restore, { duration: 0 })
+        else void fitView({ padding: 0.3 })
+      }, 100)
       called.current = true
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [ready, fitView])
+  }, [ready, fitView, restore, setViewport])
 
   return null
 }
@@ -792,6 +829,10 @@ export function RelationGraph({
     setZoom(viewport.zoom)
   }, [])
 
+  const handleMoveEnd = useCallback((_event: unknown, viewport: { x: number; y: number; zoom: number }) => {
+    saveViewport(graphScope, viewport)
+  }, [graphScope])
+
   useEffect(() => {
     const isVisible = visible ?? false
     if (isVisible && !prevVisible.current) {
@@ -858,20 +899,25 @@ export function RelationGraph({
       }
 
       const key = positionKeyOf(node)
-      let position = savedPositions[key] ?? cache[key]
+      const stored = savedPositions[key] ?? cache[key]
+      let position = stored
       if (!position) {
         position = gridPosition(index, total)
       }
-      // 防止头像/卡片叠在一起：与已放置节点重叠时，顺延到下一个空格。
-      let slot = index
-      let attempts = 0
-      while (
-        placed.some((box) => boxesOverlap(box, estimateNodeBox(node, position!))) &&
-        attempts < 600
-      ) {
-        slot += 1
-        position = gridPosition(slot, total + slot)
-        attempts += 1
+      // 只对“第一次出现、还没有保存过位置”的节点做避让。
+      // 已经保存的坐标必须原样恢复；否则两张卡片靠得近一点，
+      // 重开时就会被避让逻辑推到网格上，看起来像布局没保存。
+      if (!stored) {
+        let slot = index
+        let attempts = 0
+        while (
+          placed.some((box) => boxesOverlap(box, estimateNodeBox(node, position!))) &&
+          attempts < 600
+        ) {
+          slot += 1
+          position = gridPosition(slot, total + slot)
+          attempts += 1
+        }
       }
       cache[key] = position
       placed.push(estimateNodeBox(node, position))
@@ -921,6 +967,7 @@ export function RelationGraph({
   const autoArrange = useCallback(() => {
     layoutCacheRef.current = { scope: graphScope, positions: {} }
     clearNodePositions(graphScope)
+    clearViewport(graphScope)
     setLayoutVersion((value) => value + 1)
     window.setTimeout(() => rfRef.current?.fitView({ padding: 0.25, duration: 280 }), 60)
     toast.success('已自动整理，节点不会互相重叠')
@@ -1801,6 +1848,7 @@ export function RelationGraph({
         }}
         connectionLineStyle={{ stroke: '#8B8579', strokeWidth: 1.5 }}
         onMove={handleMove}
+        onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -1834,6 +1882,7 @@ export function RelationGraph({
         <FitViewOnLoad
           key={`${focusedSectionId ?? 'all'}:${focusedCategory ?? ''}:${focusedNodeId ?? ''}`}
           ready={filteredNodes.length > 0 && !loading}
+          restore={readViewport(graphScope)}
         />
         <MiniMap
           nodeColor={(node) => {
