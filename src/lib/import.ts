@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getActiveWorldId, getLegacyWorldId } from '@/lib/world-scope'
 import { syncRelationsFromEntities } from '@/features/relations/services'
+import { dataUrlToBlob } from '@/lib/blob-data'
 import type { QueryClient } from '@tanstack/react-query'
 import type { Table } from 'dexie'
 
@@ -279,7 +280,16 @@ export async function importData(
   const events = withWorld(records.events)
   const countries = withWorld(records.countries)
   const worldEntries = withWorld(records.worldEntries)
-  const mapRecords = withWorld(maps)
+  const restoredMaps = maps.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    const row = item as Record<string, unknown>
+    const restore = (value: unknown): unknown => {
+      if (typeof value !== 'string' || !value.startsWith('data:')) return value
+      return dataUrlToBlob(value) ?? value
+    }
+    return { ...row, imageBlob: restore(row.imageBlob), paintBlob: restore(row.paintBlob) }
+  })
+  const mapRecords = withWorld(restoredMaps)
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('oc-worlds-changed'))

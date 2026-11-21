@@ -196,6 +196,8 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
   const [line, setLine] = useState(DEFAULT_PROFILE_LINE)
   const [annotations, setAnnotations] = useState<MapAnnotation[]>([])
   const [paintBlob, setPaintBlob] = useState<Blob | null>(null)
+  const [savedImageBlob, setSavedImageBlob] = useState<Blob | null>(null)
+  const [savedStats, setSavedStats] = useState<WorldMapRecord['stats']>(undefined)
   const [paintVersion, setPaintVersion] = useState(0)
   const [political, setPolitical] = useState<PoliticalData | null>(null)
   const [selectedStateId, setSelectedStateId] = useState<number | null>(null)
@@ -248,6 +250,8 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
           setParams(normalizeMapParams(record.params))
           setAnnotations(record.annotations ?? [])
           setPaintBlob(record.paintBlob ?? null)
+          setSavedImageBlob(record.imageBlob ?? null)
+          setSavedStats(record.stats)
           setPolitical((record.political as PoliticalData | undefined) ?? null)
           setAcceptedAt(record.acceptedAt ?? null)
         }
@@ -264,7 +268,10 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
     startedRef.current = true
     const record = initialRecordRef.current
     // 首次打开生成器：有上次地图就恢复；没有地图则等待用户设置参数再生成。
-    if (record) engine.generate(record.seed, normalizeMapParams(record.params))
+    if (record) {
+      // 已保存的图片地图直接从图片开始编辑，不再重新跑生成器。
+      if (!(editorMode && record.imageBlob)) engine.generate(record.seed, normalizeMapParams(record.params))
+    }
   }, [active, engine, loaded])
 
   useEffect(() => {
@@ -281,13 +288,15 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
         setParams(nextParams)
         setAnnotations(record.annotations ?? [])
         setPaintBlob(record.paintBlob ?? null)
+        setSavedImageBlob(record.imageBlob ?? null)
+        setSavedStats(record.stats)
         setPaintVersion((version) => version + 1)
         setPolitical((record.political as PoliticalData | undefined) ?? null)
         setAcceptedAt(record.acceptedAt ?? null)
         setSelectedStateId(null)
         setRegionRevision((revision) => revision + 1)
         setActiveMapId(record.id)
-        engine.generate(record.seed, nextParams)
+        if (!(editorMode && record.imageBlob)) engine.generate(record.seed, nextParams)
       })
     }
     window.addEventListener('oc-map-open', handleOpen)
@@ -335,13 +344,37 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
   const persistKeyRef = useRef('')
   const mapwrightInputRef = useRef<HTMLInputElement>(null)
   const saveCurrentMap = useCallback(async (overrides?: { acceptedAt?: number }): Promise<WorldMapRecord | undefined> => {
-    const meta = engine.meta
+    const storedStats = savedStats ?? { landRatio: 0, maxElevation: 0, riverCells: 0, lakeCount: 0, biomeCount: 0 }
+    const meta = engine.meta ?? (savedImageBlob
+      ? {
+          algorithmVersion: 2,
+          seed: parseSeed(seedText),
+          params,
+          generatedAt: Date.now(),
+          stats: {
+            landRatio: storedStats.landRatio,
+            maxElevation: storedStats.maxElevation,
+            riverCells: storedStats.riverCells,
+            lakeCount: storedStats.lakeCount,
+            biomeCount: storedStats.biomeCount,
+            oceanCells: 0,
+            landCells: 0,
+            minElevation: 0,
+            lakeCells: 0,
+            biomeCounts: [],
+            meanTemperature: 0,
+            meanPrecipitation: 0,
+          },
+          width: params.width,
+          height: params.height,
+        }
+      : null)
     if (!meta) return undefined
     const name = mapName.trim() || '未命名世界'
     setSaving(true)
     try {
       const image = engine.image
-      const imageBlob = image ? await composeMapBlob(image, political) : undefined
+      const imageBlob = image ? await composeMapBlob(image, political) : savedImageBlob ?? undefined
       const record = await saveGeneratedMap({
         id: mapId,
         name,
@@ -797,7 +830,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
   const archiveUnsavedMap = useCallback(async () => {
     if (mapId !== undefined || !engine.meta) return
     const image = engine.image
-    const imageBlob = image ? await composeMapBlob(image, political) : undefined
+    const imageBlob = image ? await composeMapBlob(image, political) : savedImageBlob ?? undefined
     const record = await saveGeneratedMap({
       name: mapName.trim() || '未命名地图',
       seed: engine.meta.seed,
@@ -1469,6 +1502,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
           <div className="relative flex min-h-0 flex-1 flex-col">
             <MapCanvas
               image={engine.image}
+              staticImage={editorMode ? savedImageBlob : null}
               view={engine.view}
               line={line}
               onLineChange={setLine}

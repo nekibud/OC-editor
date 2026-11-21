@@ -15,6 +15,8 @@ export interface RegionOverlay {
 
 interface MapCanvasProps {
   image: ImageData | null
+  /** 已保存地图的图片模式；有它时不再依赖生成器 ImageData。 */
+  staticImage?: Blob | null
   view: string
   line: MapLine
   onLineChange: (line: MapLine) => void
@@ -263,6 +265,7 @@ function drawAnnotationLabel(
 
 export function MapCanvas({
   image,
+  staticImage = null,
   view,
   line,
   onLineChange,
@@ -326,8 +329,9 @@ export function MapCanvas({
     placement: { x: number; y: number; width: number; height: number }
   }>(null)
 
-  const imageWidth = image?.width ?? 1024
-  const imageHeight = image?.height ?? 1024
+  const [staticSize, setStaticSize] = useState<{ width: number; height: number } | null>(null)
+  const imageWidth = staticSize?.width ?? image?.width ?? 1024
+  const imageHeight = staticSize?.height ?? image?.height ?? 1024
 
   const vectorPaths = useMemo(() => {
     if (!vectors) return null
@@ -409,13 +413,38 @@ export function MapCanvas({
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !image) return
-    canvas.width = image.width
-    canvas.height = image.height
-    const context = canvas.getContext('2d')
-    if (!context) return
-    context.putImageData(image, 0, 0)
-  }, [image])
+    if (!canvas) return
+    if (!staticImage) {
+      if (!image) return
+      canvas.width = image.width
+      canvas.height = image.height
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.putImageData(image, 0, 0)
+      return
+    }
+    let cancelled = false
+    let bitmap: ImageBitmap | null = null
+    void createImageBitmap(staticImage).then((next) => {
+      if (cancelled) {
+        next.close()
+        return
+      }
+      bitmap = next
+      canvas.width = next.width
+      canvas.height = next.height
+      const context = canvas.getContext('2d')
+      if (context) context.drawImage(next, 0, 0)
+      setStaticSize({ width: next.width, height: next.height })
+      next.close()
+    }).catch(() => {
+      // 图片损坏时保留空画布，不阻塞标注/画笔层。
+    })
+    return () => {
+      cancelled = true
+      bitmap?.close()
+    }
+  }, [image, staticImage])
 
   useEffect(() => {
     const canvas = overlayRef.current

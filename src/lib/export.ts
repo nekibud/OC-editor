@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { filterByActiveWorld } from '@/lib/world-scope'
 import { createZip, downloadBlob } from '@/lib/zip'
 import { embedImagesDeep } from '@/lib/embed-assets'
+import { blobToDataUrl } from '@/lib/blob-data'
 
 export interface ExportPayload {
   version: 2
@@ -35,13 +36,20 @@ export async function exportAllData(): Promise<ExportPayload> {
     db.worlds.filter((w) => !w.deleted).toArray(),
   ])
 
+  const mapsWithImages = await Promise.all(
+    maps.map(async (map) => ({
+      ...map,
+      imageBlob: map.imageBlob ? await blobToDataUrl(map.imageBlob) : undefined,
+      paintBlob: map.paintBlob ? await blobToDataUrl(map.paintBlob) : undefined,
+    })),
+  )
   const embedded = await embedImagesDeep({
     characters,
     events,
     countries,
     worldEntries,
     tags,
-    maps,
+    maps: mapsWithImages,
     worlds,
   })
 
