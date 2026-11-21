@@ -200,8 +200,26 @@ function applyLanguage(): void {
 export function LanguageTranslator(): null {
   useEffect(() => {
     applyLanguage()
+    let editingField = false
+    const isField = (target: EventTarget | null): boolean => {
+      const element = target instanceof Element ? target : null
+      return Boolean(element?.closest('input, textarea, [contenteditable="true"]'))
+    }
+    const onFocusIn = (event: FocusEvent): void => {
+      if (isField(event.target)) editingField = true
+    }
+    const onFocusOut = (): void => {
+      window.setTimeout(() => {
+        editingField = isField(document.activeElement)
+        if (!editingField && getLocale() === 'en') applyLanguage()
+      }, 0)
+    }
+    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusout', onFocusOut)
     const observer = new MutationObserver((mutations) => {
-      if (getLocale() !== 'en') return
+      // 输入法/改名输入框获得焦点时不要改写 DOM，
+      // 否则翻译节点和 React 受控输入会互相触发，造成卡死。
+      if (editingField || getLocale() !== 'en') return
       for (const mutation of mutations) {
         if (mutation.type === 'characterData') {
           translateTextNode(mutation.target as Text, 'en')
@@ -219,7 +237,11 @@ export function LanguageTranslator(): null {
       attributes: true,
       attributeFilter: [...ATTRS],
     })
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusout', onFocusOut)
+    }
   }, [])
   return null
 }
