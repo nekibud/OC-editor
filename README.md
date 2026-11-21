@@ -12,24 +12,26 @@
 
 ## 下载
 
-**最新版：v0.21.2（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
+**最新版：v0.21.3（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
 
-- [便携版 OC-editor-0.21.2-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.21.2/OC-editor-0.21.2-portable-win64.zip) ← **推荐：解压即用，不需要安装**
-- [安装程序 OC-editor-0.21.2-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.21.2/OC-editor-0.21.2-Setup.exe)
-- [微软商店 MSIX 包 OC-editor-0.21.2.msix](https://github.com/nekibud/OC-editor/releases/download/v0.21.2/OC-editor-0.21.2.msix)（Microsoft Store 提交用）
+- [便携版 OC-editor-0.21.3-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.21.3/OC-editor-0.21.3-portable-win64.zip) ← **推荐：解压即用，不需要安装**
+- [安装程序 OC-editor-0.21.3-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.21.3/OC-editor-0.21.3-Setup.exe)
+- [微软商店 MSIX 包 OC-editor-0.21.3.msix](https://github.com/nekibud/OC-editor/releases/download/v0.21.3/OC-editor-0.21.3.msix)（Microsoft Store 提交用）
 
 **GitHub Packages**：`OCEditor` NuGet 包（内含 MSIX + 便携版 ZIP）  
 https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 > GitHub Packages 不能直接托管 `.msix`，所以用 NuGet 包承载安装文件；普通用户优先用上面的 Release 下载。
 
-> **0.21.2 更新**：
+> **0.21.3 更新**：
 > 1. 已保存地图从地图库打开时直接以图片为底图编辑（画笔、标注、区域叠放），
 >    不再每次重新跑地图生成器；地图图片也会随全量备份导出/恢复。
 > 2. 新建自定义分类和武器/宠物分类时，关系图会自动补齐预设分类节点并保存布局位置。
-> 3. 设置「关于」的版本号改为读取 `package.json`，以后发版不再写死；加入本软件/原作者
+> 3. 关系图重开不再“回乱”：已保存节点坐标原样恢复，不再被自动避让推回网格；
+>    画布的缩放/平移位置也按世界观+作用域保存，重开不再强制 fitView 到另一个视角。
+> 4. 设置「关于」的版本号改为读取 `package.json`，以后发版不再写死；加入本软件/原作者
 >    GitHub、原作者开源库与小红书号（7439859280）入口。
-> 4. 取消角色卡模块，保留其他地图/关系图/设置修复。
+> 5. 取消角色卡模块，保留其他地图/关系图/设置修复。
 
 > **0.20.6 修复**：
 > 1. 世界观词条拖拽到侧栏空白处会形成 A→B→A 的环，整棵树从根上消失；
@@ -73,7 +75,7 @@ https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
-当前版本：**v0.21.2 · local-first**
+当前版本：**v0.21.3 · local-first**
 
 本仓库在原有角色 / 事件 / 国家 / 词条 / 时间线 / 关系图谱骨架上增量扩展，
 新增了**多世界观隔离**、**程序化世界地图生成器**与**可折叠树形表格**。运行时完全离线：无账号、无云同步、
