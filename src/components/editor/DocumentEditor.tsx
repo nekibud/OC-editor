@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import { EditorCore } from '@/components/editor/EditorCore'
 import { useDocument } from '@/hooks/useDocument'
+import { translateText } from '@/lib/i18n'
 
 type EntityType = 'character' | 'event' | 'country' | 'worldEntry'
 
@@ -61,9 +62,9 @@ export function DocumentEditor({
 type DocNode = { type: string; attrs?: Record<string, unknown>; content?: DocNode[]; text?: string }
 
 function t(value: string): DocNode { return { type: 'text', text: value } }
-function h2b(text: string): DocNode { return { type: 'heading', attrs: { level: 2 }, content: [t(text)] } }
-function p(text?: string): DocNode { return text ? { type: 'paragraph', content: [t(text)] } : { type: 'paragraph' } }
-function pp(placeholder: string): DocNode { return { type: 'paragraph', attrs: { placeholder } } }
+function h2b(text: string): DocNode { return { type: 'heading', attrs: { level: 2 }, content: [t(translateText(text))] } }
+function p(text?: string): DocNode { return text ? { type: 'paragraph', content: [t(translateText(text))] } : { type: 'paragraph' } }
+function pp(placeholder: string): DocNode { return { type: 'paragraph', attrs: { placeholder: translateText(placeholder) } } }
 function hr(): DocNode { return { type: 'horizontalRule' } }
 
 function getDefaultDocument(type: EntityType): DocNode {

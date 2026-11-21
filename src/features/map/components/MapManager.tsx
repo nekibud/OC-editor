@@ -5,6 +5,7 @@ import { Download, ExternalLink, FolderOpen, Map as MapIcon, RefreshCw, Star, Tr
 import type { WorldMapRecord } from '@/types'
 import { db } from '@/lib/db'
 import { filterByActiveWorld } from '@/lib/world-scope'
+import { localeDateCode } from '@/lib/i18n'
 import {
   deleteMap,
   getMapRecords,
@@ -30,7 +31,7 @@ function formatSeed(seed: number): string {
 
 function formatDate(timestamp: number): string {
   try {
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
+    return new Date(timestamp).toLocaleDateString(localeDateCode(), {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

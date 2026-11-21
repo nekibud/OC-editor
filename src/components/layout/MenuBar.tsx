@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { tauriReadClipboard } from '@/lib/tauri-clipboard'
 import { createPortal } from 'react-dom'
-import { Search, Users, Calendar, Flag, BookOpen, Minus, Maximize2, Minimize2, X, Check } from 'lucide-react'
+import { Search, Users, Calendar, Flag, BookOpen, Minus, Maximize2, Minimize2, X, Check, Languages } from 'lucide-react'
 import { searchAllEntitiesFlat } from '@/lib/reference-registry'
 import { useEntityNavigate } from '@/components/layout/EntityNavigateContext'
 import { useSettingsTrigger } from '@/components/layout/SettingsTriggerContext'
@@ -12,6 +12,7 @@ import { useImportExport } from '@/components/shared/ImportExportUI'
 import { downloadMarkdown, downloadTxt } from '@/lib/export'
 import { toast } from 'sonner'
 import { useActiveEditor } from '@/lib/editor-context'
+import { useLocale } from '@/lib/i18n'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -62,6 +63,7 @@ export function MenuBar() {
   const { openSettings } = useSettingsTrigger()
   const { handleExport, handleExportZip, handleImportClick, dialog: importExportDialog } = useImportExport()
   const { activeEditor } = useActiveEditor()
+  const { locale, toggleLocale } = useLocale()
 
   const [redoConfirmOpen, setRedoConfirmOpen] = useState(false)
   const redoTargetRef = useRef<typeof activeEditor>(null)
@@ -480,6 +482,20 @@ export function MenuBar() {
             document.getElementById('overlay-root')!,
           ) : null}
         </div>
+      </div>
+
+      <div className="ml-auto flex items-center gap-1" data-no-drag>
+        <button
+          type="button"
+          data-no-i18n
+          onClick={toggleLocale}
+          className="flex h-7 items-center gap-1 rounded border border-line px-2 text-[10px] text-ink-muted transition-colors hover:border-line-hover hover:text-ink"
+          title={locale === 'zh' ? 'Switch to English' : '切换为中文'}
+          aria-label={locale === 'zh' ? 'Switch to English' : '切换为中文'}
+        >
+          <Languages size={13} strokeWidth={2} />
+          {locale === 'zh' ? 'EN' : '中文'}
+        </button>
       </div>
 
       {windowHost !== 'browser' ? (

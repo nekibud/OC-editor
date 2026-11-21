@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { localeDateCode } from '@/lib/i18n'
 import {
   ArrowLeft,
   BookOpen,
@@ -33,7 +34,7 @@ import { useNavigation } from '@/components/layout/NavigationContext'
 import { useWordCount } from '@/components/layout/WordCountContext'
 
 function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('zh-CN', {
+  return new Date(timestamp).toLocaleDateString(localeDateCode(), {
     month: '2-digit',
     day: '2-digit',
   })

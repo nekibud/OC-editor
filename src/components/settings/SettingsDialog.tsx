@@ -28,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useSettings } from "@/lib/settings"
 import { useDevice } from "@/lib/use-device"
 import { useImportExport } from "@/components/shared/ImportExportUI"
+import { useLocale } from "@/lib/i18n"
 import packageJson from "../../../package.json"
 
 interface SettingsDialogProps {
@@ -123,6 +124,7 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const { settings, updateSetting } = useSettings()
   const { isMobile } = useDevice()
+  const { locale, toggleLocale } = useLocale()
   const {
     handleExport,
     handleExportZip,
@@ -238,6 +240,18 @@ export function SettingsDialog({
                       updateSetting("theme", v as "light" | "dark" | "auto")
                     }
                   />
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-line pt-3">
+                  <span className="text-sm text-ink">语言</span>
+                  <button
+                    type="button"
+                    data-no-i18n
+                    onClick={toggleLocale}
+                    className="flex h-8 w-fit items-center gap-1 rounded border border-line px-3 text-xs text-ink-muted hover:border-line-hover hover:text-ink"
+                  >
+                    {locale === 'zh' ? '中文 / English' : 'English / 中文'}
+                  </button>
                 </div>
 
                 <div className="flex flex-col gap-2 border-t border-line pt-3">

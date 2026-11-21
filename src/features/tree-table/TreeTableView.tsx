@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { localeDateCode } from '@/lib/i18n'
 import type { Character, Country, Tag, WorldEntry } from '@/types'
 import { useEntryList } from '@/features/world/hooks/useWorldEntries'
 import { updateEntry, deleteEntry, createEntry } from '@/features/world/services'
@@ -96,7 +97,7 @@ function computeSafeParents(rows: Array<{ id?: number; parentId?: number | null;
 
 function formatDate(timestamp: number): string {
   try {
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
+    return new Date(timestamp).toLocaleDateString(localeDateCode(), {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
