@@ -13,6 +13,9 @@ import {
   Copy,
   Music2,
   Tv,
+  Globe2,
+  ExternalLink,
+  BookOpen,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -25,12 +28,20 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useSettings } from "@/lib/settings"
 import { useDevice } from "@/lib/use-device"
 import { useImportExport } from "@/components/shared/ImportExportUI"
+import packageJson from "../../../package.json"
 
 interface SettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   defaultTab?: string
 }
+
+const APP_VERSION = packageJson.version
+const GITHUB_REPO = 'https://github.com/nekibud/OC-editor'
+const GITHUB_ACCOUNT = 'https://github.com/nekibud'
+const ORIGINAL_GITHUB = 'https://github.com/Pokanshuu'
+const ORIGINAL_REPO = 'https://github.com/Pokanshuu/simple-ocbak'
+const XHS_ID = '7439859280'
 
 const TAB_ITEMS = [
   { value: "general", label: "通用", icon: Cpu },
@@ -381,7 +392,7 @@ export function SettingsDialog({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-ink">版本</span>
                   <span className="text-sm text-ink-muted font-mono">
-                    v0.20.6 · local-first
+                    v{APP_VERSION} · local-first
                   </span>
                 </div>
                 <div className="rounded border border-line p-3 text-xs leading-5 text-ink-muted">
@@ -392,6 +403,69 @@ export function SettingsDialog({
                   <p className="mt-2 text-ink-faint">
                     Tauri v2 + Next.js + TypeScript + Dexie.js · MIT License
                   </p>
+                </div>
+
+                <div className="rounded-xl border border-line bg-paper-card/40 p-3">
+                  <p className="mb-2 text-xs font-medium text-ink">GitHub 与相关链接</p>
+                  <div className="space-y-2">
+                    <a
+                      href={GITHUB_REPO}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">本软件 GitHub 仓库 · nekibud/OC-editor</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <a
+                      href={GITHUB_ACCOUNT}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">我的 GitHub · nekibud</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <a
+                      href={ORIGINAL_GITHUB}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">原作者 GitHub · Pokanshuu</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <a
+                      href={ORIGINAL_REPO}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">原作者开源库 · simple-ocbak</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <div className="flex items-center gap-2 rounded-lg px-1 py-1">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/5 text-ink-muted dark:bg-white/5">
+                        <BookOpen size={14} strokeWidth={2} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-ink">原作者小红书</p>
+                        <p className="text-[10px] text-ink-faint">小红书号 {XHS_ID}</p>
+                      </div>
+                      <button
+                        onClick={() => copyAccount(XHS_ID, '小红书号')}
+                        className="flex h-7 items-center gap-1 rounded-lg border border-line px-2 text-[10px] text-ink-muted hover:border-line-hover hover:text-ink"
+                        title="复制小红书号"
+                      >
+                        <Copy size={11} strokeWidth={2} />
+                        复制
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-line bg-paper-card/40 p-3">
@@ -437,7 +511,7 @@ export function SettingsDialog({
                   </p>
                 </div>
                 <p className="text-[11px] text-ink-faint">
-                  本构建不包含检查更新与外部项目链接，以避免运行时网络访问。
+                  本软件运行时完全离线；上面的 GitHub / 小红书链接只有点击时才会由系统浏览器打开。
                 </p>
               </div>
             </TabsContent>

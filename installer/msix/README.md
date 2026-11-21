@@ -15,7 +15,7 @@
 <Identity
   Name="nekibud.OCeditor"
   Publisher="CN=A253FC2F-9875-4EC2-81A3-B72B3FBF5200"
-  Version="0.20.6.0"
+  Version="0.21.0.0"
   ProcessorArchitecture="x64" />
 ```
 
@@ -61,5 +61,5 @@ $cert = New-SelfSignedCertificate -Type Custom -KeyUsage DigitalSignature `
   -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
 Export-PfxCertificate -Cert $cert -FilePath devcert.pfx -Password (ConvertTo-SecureString "dev" -AsPlainText -Force)
 Import-PfxCertificate -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" -FilePath devcert.pfx -Password (ConvertTo-SecureString "dev" -AsPlainText -Force)
-signtool sign /fd SHA256 /f devcert.pfx /p dev /a OC-editor-0.20.6.msix
+signtool sign /fd SHA256 /f devcert.pfx /p dev /a OC-editor-0.21.0.msix
 ```

@@ -39,7 +39,7 @@ import { CountryNode } from './CountryNode'
 import { RelationEdge } from './RelationEdge'
 import { CustomEdge } from './CustomEdge'
 import { CustomGraphNode } from './CustomGraphNode'
-import { useCustomSections } from '@/features/custom-sections'
+import { ensurePresetSections, useCustomSections } from '@/features/custom-sections'
 import { AppConfirm } from '@/components/shared/AppConfirm'
 import { toast } from 'sonner'
 import { saveBlobToDisk } from '@/lib/image-service'
@@ -246,6 +246,16 @@ export function RelationGraph({
     removeScopedEdge,
     setEdgeLabel,
   } = useCustomSections()
+
+  // 新世界第一次打开关系图时也要有“武器/宠物”两个预设分类，
+  // 否则它们只会出现在侧栏，关系图里没有对应分类节点。
+  useEffect(() => {
+    ensurePresetSections()
+    const handler = (): void => ensurePresetSections()
+    window.addEventListener('oc-world-changed', handler)
+    return () => window.removeEventListener('oc-world-changed', handler)
+  }, [])
+
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null)
   const [focusedCategory, setFocusedCategory] = useState<'character' | 'event' | 'country' | null>(null)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
@@ -879,16 +889,19 @@ export function RelationGraph({
   }, [filteredNodes, graphScope, hiddenSectionIds, highlightedNodeId, layoutVersion])
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const nodesRef = useRef<Node[]>([])
+  useEffect(() => { nodesRef.current = nodes }, [nodes])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const persistLayout = useCallback(
     (announce = false, override?: Node) => {
       const positions: Record<string, { x: number; y: number }> = {}
-      for (const node of nodes) {
+      const currentNodes = nodesRef.current
+      for (const node of currentNodes) {
         const position = node.id === override?.id ? override.position : node.position
         positions[positionKeyOf(node)] = { x: position.x, y: position.y }
       }
-      if (override && !nodes.some((node) => node.id === override.id)) {
+      if (override && !currentNodes.some((node) => node.id === override.id)) {
         positions[positionKeyOf(override)] = {
           x: override.position.x,
           y: override.position.y,
@@ -902,12 +915,12 @@ export function RelationGraph({
       }
       if (announce) toast.success('布局已保存')
     },
-    [graphScope, nodes],
+    [graphScope],
   )
 
   const autoArrange = useCallback(() => {
     layoutCacheRef.current = { scope: graphScope, positions: {} }
-    saveNodePositions(graphScope, {})
+    clearNodePositions(graphScope)
     setLayoutVersion((value) => value + 1)
     window.setTimeout(() => rfRef.current?.fitView({ padding: 0.25, duration: 280 }), 60)
     toast.success('已自动整理，节点不会互相重叠')
@@ -1372,6 +1385,9 @@ export function RelationGraph({
     if (createdNodeId) setHighlightedNodeId(createdNodeId)
     window.dispatchEvent(new Event('data-updated'))
     refresh()
+    // 新建分类/条目后立刻把它的默认位置写进布局，
+    // 避免用户马上切走时 500ms 防抖还没触发，重开就“没有模板”。
+    window.setTimeout(() => persistLayout(false), 180)
   }
 
   const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
