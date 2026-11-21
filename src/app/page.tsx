@@ -25,7 +25,6 @@ import { WorldLayout } from '@/features/world/components/WorldLayout'
 import { TimelineView } from '@/features/timeline/components/TimelineView'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { NovelView } from '@/features/novel/NovelView'
-import { CharacterCardStudio } from '@/features/cards/CharacterCardStudio'
 import { GlobalAlbum } from '@/components/shared/GlobalAlbum'
 const RelationGraph = dynamic(
   () => import('@/features/relations').then((mod) => ({ default: mod.RelationGraph })),
@@ -529,7 +528,6 @@ export default function Home() {
   const showCountries = activeItem === '国家'
   const showWorld = activeItem === '世界观'
   const showNovel = activeItem === '小说'
-  const showCards = activeItem === '角色卡'
   const showTreeTable = activeItem === '树表'
   const showMapGenerator = activeItem === '地图生成器'
   const showMapManager = activeItem === '地图'
@@ -538,7 +536,7 @@ export default function Home() {
   const showAlbum = activeItem === '相册'
   const customSectionId = activeItem?.startsWith('custom:') ? activeItem.slice(7) : null
   const showCustomSection = customSectionId !== null
-  const showPlaceholder = activeItem !== null && !showEvents && !showCharacters && !showCountries && !showWorld && !showNovel && !showCards && !showTreeTable && !showMapGenerator && !showMapManager && !showTimeline && !showRelations && !showAlbum && !showCustomSection
+  const showPlaceholder = activeItem !== null && !showEvents && !showCharacters && !showCountries && !showWorld && !showNovel && !showTreeTable && !showMapGenerator && !showMapManager && !showTimeline && !showRelations && !showAlbum && !showCustomSection
   const placeholderText = activeItem !== null
     ? (PLACEHOLDER_MAP[activeItem] ?? '功能开发中...')
     : null
@@ -710,12 +708,6 @@ export default function Home() {
         <NovelView />
       </div>
 
-      <div
-        className="h-full section-fade overflow-y-auto max-md:pt-[calc(60px+var(--safe-top))] max-md:pb-[calc(60px+var(--safe-bottom))]"
-        data-visible={showCards ? "true" : "false"}
-      >
-        <CharacterCardStudio onNavigate={(id, type) => handleRelatedItemNavigate(id, type)} />
-      </div>
       <div
         className="h-full section-fade overflow-y-auto section-fade-no-gutter"
         data-visible={showTreeTable ? "true" : "false"}

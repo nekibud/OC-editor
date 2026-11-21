@@ -18,7 +18,6 @@ import {
   Shapes,
   GripVertical,
   PenLine,
-  IdCard,
   Sword,
   PawPrint,
 } from 'lucide-react'
@@ -115,7 +114,6 @@ const navItems = [
   { label: '世界观', icon: BookOpen },
   { label: '树表', icon: Table2 },
   { label: '小说', icon: PenLine },
-  { label: '角色卡', icon: IdCard },
   { label: '地图生成器', icon: MapIcon },
   { label: '地图', icon: FolderOpen },
   { label: '时间线', icon: Clock },
