@@ -12,22 +12,24 @@
 
 ## 下载
 
-**最新版：v0.21.0（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
+**最新版：v0.21.1（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
 
-- [便携版 OC-editor-0.21.0-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.21.0/OC-editor-0.21.0-portable-win64.zip) ← **推荐：解压即用，不需要安装**
-- [安装程序 OC-editor-0.21.0-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.21.0/OC-editor-0.21.0-Setup.exe)
-- [微软商店 MSIX 包 OC-editor-0.21.0.msix](https://github.com/nekibud/OC-editor/releases/download/v0.21.0/OC-editor-0.21.0.msix)（Microsoft Store 提交用）
+- [便携版 OC-editor-0.21.1-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.21.1/OC-editor-0.21.1-portable-win64.zip) ← **推荐：解压即用，不需要安装**
+- [安装程序 OC-editor-0.21.1-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.21.1/OC-editor-0.21.1-Setup.exe)
+- [微软商店 MSIX 包 OC-editor-0.21.1.msix](https://github.com/nekibud/OC-editor/releases/download/v0.21.1/OC-editor-0.21.1.msix)（Microsoft Store 提交用）
 
 **GitHub Packages**：`OCEditor` NuGet 包（内含 MSIX + 便携版 ZIP）  
 https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 > GitHub Packages 不能直接托管 `.msix`，所以用 NuGet 包承载安装文件；普通用户优先用上面的 Release 下载。
 
-> **0.21.0 新增**：
+> **0.21.1 新增**：
 > 1. 新增「角色卡」模块：默认/自定义底图、图片框、文字层、@ 跳转层，支持拖拽/尺寸调整、
 >    PNG 导出、本地角色卡仓库（重命名、打开、保存）。
 > 2. 新建自定义分类和武器/宠物分类时，关系图会自动补齐预设分类节点并保存布局位置。
-> 3. 设置「关于」的版本号改为读取 `package.json`，以后发版不再写死；加入本软件/原作者
+> 3. 已保存地图从地图库打开时直接以图片为底图编辑（画笔、标注、区域叠放），
+>    不再每次重新跑地图生成器；地图图片也会随全量备份导出/恢复。
+> 4. 设置「关于」的版本号改为读取 `package.json`，以后发版不再写死；加入本软件/原作者
 >    GitHub、原作者开源库与小红书号（7439859280）入口。
 
 > **0.20.6 修复**：
@@ -72,7 +74,7 @@ https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
-当前版本：**v0.21.0 · local-first**
+当前版本：**v0.21.1 · local-first**
 
 本仓库在原有角色 / 事件 / 国家 / 词条 / 时间线 / 关系图谱骨架上增量扩展，
 新增了**多世界观隔离**、**程序化世界地图生成器**与**可折叠树形表格**。运行时完全离线：无账号、无云同步、
