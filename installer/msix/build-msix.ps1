@@ -1,6 +1,6 @@
 ﻿param(
     [string]$MakeAppx = "",
-    [string]$Version = "0.22.4",
+    [string]$Version = "0.22.5",
     [string]$Configuration = "Release"
 )
 

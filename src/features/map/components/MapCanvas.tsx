@@ -17,6 +17,7 @@ interface MapCanvasProps {
   image: ImageData | null
   /** 已保存地图的图片模式；有它时不再依赖生成器 ImageData。 */
   staticImage?: Blob | null
+  onStaticImageError?: () => void
   view: string
   line: MapLine
   onLineChange: (line: MapLine) => void
@@ -266,6 +267,7 @@ function drawAnnotationLabel(
 export function MapCanvas({
   image,
   staticImage = null,
+  onStaticImageError,
   view,
   line,
   onLineChange,
@@ -438,7 +440,8 @@ export function MapCanvas({
       setStaticSize({ width: next.width, height: next.height })
       next.close()
     }).catch(() => {
-      // 图片损坏时保留空画布，不阻塞标注/画笔层。
+      // 图片损坏时通知工作台回退到生成器，而不是留下一块空画布。
+      onStaticImageError?.()
     })
     return () => {
       cancelled = true

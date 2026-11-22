@@ -197,6 +197,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
   const [annotations, setAnnotations] = useState<MapAnnotation[]>([])
   const [paintBlob, setPaintBlob] = useState<Blob | null>(null)
   const [savedImageBlob, setSavedImageBlob] = useState<Blob | null>(null)
+  const [staticImageFailed, setStaticImageFailed] = useState(false)
   const [savedStats, setSavedStats] = useState<WorldMapRecord['stats']>(undefined)
   const [paintVersion, setPaintVersion] = useState(0)
   const [political, setPolitical] = useState<PoliticalData | null>(null)
@@ -251,6 +252,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
           setAnnotations(record.annotations ?? [])
           setPaintBlob(record.paintBlob ?? null)
           setSavedImageBlob(record.imageBlob ?? null)
+          setStaticImageFailed(false)
           setSavedStats(record.stats)
           setPolitical((record.political as PoliticalData | undefined) ?? null)
           setAcceptedAt(record.acceptedAt ?? null)
@@ -275,6 +277,12 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
   }, [active, engine, loaded])
 
   useEffect(() => {
+    if (!staticImageFailed || !editorMode || !loaded || !engine.workerReady) return
+    const record = initialRecordRef.current
+    if (record) engine.generate(record.seed, normalizeMapParams(record.params))
+  }, [editorMode, engine.workerReady, loaded, staticImageFailed])
+
+  useEffect(() => {
     const handleOpen = (event: Event): void => {
       const id = (event as CustomEvent<number>).detail
       if (typeof id !== 'number') return
@@ -289,6 +297,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
         setAnnotations(record.annotations ?? [])
         setPaintBlob(record.paintBlob ?? null)
         setSavedImageBlob(record.imageBlob ?? null)
+        setStaticImageFailed(false)
         setSavedStats(record.stats)
         setPaintVersion((version) => version + 1)
         setPolitical((record.political as PoliticalData | undefined) ?? null)
@@ -1503,6 +1512,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
             <MapCanvas
               image={engine.image}
               staticImage={editorMode ? savedImageBlob : null}
+              onStaticImageError={() => setStaticImageFailed(true)}
               view={engine.view}
               line={line}
               onLineChange={setLine}
@@ -1576,7 +1586,7 @@ export function MapView({ active = true, mode = 'generator', onCloseEditor }: Ma
               </div>
             ) : null}
 
-            {!engine.meta && !generating && editorMode ? (
+            {!engine.meta && !savedImageBlob && !generating && editorMode ? (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
                 <div className="rounded-xl border border-line bg-paper/95 px-4 py-3 text-center shadow-sm">
                   <p className="text-xs text-ink">还没有打开地图</p>
