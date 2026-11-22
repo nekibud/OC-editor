@@ -420,8 +420,20 @@ export function SettingsDialog({
                 </div>
 
                 <div className="rounded-xl border border-line bg-paper-card/40 p-3">
-                  <p className="mb-2 text-xs font-medium text-ink">GitHub 与相关链接</p>
-                  <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-ink">OC editor 作者信息</p>
+                      <p className="mt-0.5 text-[10px] text-ink-faint">本软件当前维护者</p>
+                    </div>
+                    <span className="rounded-full border border-line px-2 py-0.5 text-[9px] text-ink-faint">
+                      OC editor
+                    </span>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-black/[0.03] px-3 py-2 dark:bg-white/[0.03]">
+                    <p className="text-sm font-medium text-ink">nekibud</p>
+                    <p className="text-[10px] text-ink-faint">作者 · 本软件维护者</p>
+                  </div>
+                  <div className="mt-2 space-y-2">
                     <a
                       href={GITHUB_REPO}
                       target="_blank"
@@ -429,7 +441,7 @@ export function SettingsDialog({
                       className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
                     >
                       <Globe2 size={14} strokeWidth={2} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">本软件 GitHub 仓库 · nekibud/OC-editor</span>
+                      <span className="min-w-0 flex-1 truncate">GitHub 仓库 · nekibud/OC-editor</span>
                       <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
                     </a>
                     <a
@@ -439,53 +451,10 @@ export function SettingsDialog({
                       className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
                     >
                       <Globe2 size={14} strokeWidth={2} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">我的 GitHub · nekibud</span>
-                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
-                    </a>
-                    <a
-                      href={ORIGINAL_GITHUB}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
-                    >
-                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">原作者 GitHub · Pokanshuu</span>
-                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
-                    </a>
-                    <a
-                      href={ORIGINAL_REPO}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
-                    >
-                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">原作者开源库 · simple-ocbak</span>
+                      <span className="min-w-0 flex-1 truncate">GitHub 账号 · @nekibud</span>
                       <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
                     </a>
                     <div className="flex items-center gap-2 rounded-lg px-1 py-1">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/5 text-ink-muted dark:bg-white/5">
-                        <BookOpen size={14} strokeWidth={2} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-ink">原作者小红书</p>
-                        <p className="text-[10px] text-ink-faint">小红书号 {XHS_ID}</p>
-                      </div>
-                      <button
-                        onClick={() => copyAccount(XHS_ID, '小红书号')}
-                        className="flex h-7 items-center gap-1 rounded-lg border border-line px-2 text-[10px] text-ink-muted hover:border-line-hover hover:text-ink"
-                        title="复制小红书号"
-                      >
-                        <Copy size={11} strokeWidth={2} />
-                        复制
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-line bg-paper-card/40 p-3">
-                  <p className="mb-2 text-xs font-medium text-ink">作者账号</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/5 text-ink-muted dark:bg-white/5">
                         <Music2 size={14} strokeWidth={2} />
                       </span>
@@ -502,7 +471,7 @@ export function SettingsDialog({
                         复制
                       </button>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-lg px-1 py-1">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/5 text-ink-muted dark:bg-white/5">
                         <Tv size={14} strokeWidth={2} />
                       </span>
@@ -520,10 +489,66 @@ export function SettingsDialog({
                       </button>
                     </div>
                   </div>
-                  <p className="mt-2 text-[10px] text-ink-faint">
-                    点击复制账号名，可在对应平台搜索关注。
-                  </p>
                 </div>
+
+                <div className="rounded-xl border border-line bg-paper-card/40 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-ink">开源作者信息</p>
+                      <p className="mt-0.5 text-[10px] text-ink-faint">原始开源项目作者</p>
+                    </div>
+                    <span className="rounded-full border border-line px-2 py-0.5 text-[9px] text-ink-faint">
+                      开源来源
+                    </span>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-black/[0.03] px-3 py-2 dark:bg-white/[0.03]">
+                    <p className="text-sm font-medium text-ink">Pokanshuu</p>
+                    <p className="text-[10px] text-ink-faint">开源作者 · simple-ocbak</p>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    <a
+                      href={ORIGINAL_GITHUB}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">GitHub 账号 · @Pokanshuu</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <a
+                      href={ORIGINAL_REPO}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+                    >
+                      <Globe2 size={14} strokeWidth={2} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">开源库 · simple-ocbak</span>
+                      <ExternalLink size={12} strokeWidth={2} className="shrink-0" />
+                    </a>
+                    <div className="flex items-center gap-2 rounded-lg px-1 py-1">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/5 text-ink-muted dark:bg-white/5">
+                        <BookOpen size={14} strokeWidth={2} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-ink">小红书 · Pokanshuu</p>
+                        <p className="text-[10px] text-ink-faint">小红书号 {XHS_ID}</p>
+                      </div>
+                      <button
+                        onClick={() => copyAccount(XHS_ID, '小红书号')}
+                        className="flex h-7 items-center gap-1 rounded-lg border border-line px-2 text-[10px] text-ink-muted hover:border-line-hover hover:text-ink"
+                        title="复制小红书号"
+                      >
+                        <Copy size={11} strokeWidth={2} />
+                        复制
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] leading-5 text-ink-faint">
+                  OC editor 是在原始开源项目基础上继续开发的版本。上方已按「OC editor 作者信息」和「开源作者信息」分开标注。
+                </p>
                 <p className="text-[11px] text-ink-faint">
                   本软件运行时完全离线；上面的 GitHub / 小红书链接只有点击时才会由系统浏览器打开。
                 </p>
