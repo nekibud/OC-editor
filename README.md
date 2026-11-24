@@ -12,18 +12,18 @@
 
 ## 下载
 
-**最新版：v0.22.5（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
+**最新版：v0.22.6（全功能回归修复 + .ocbak 分类导出/导入 + 小说 PNG 第三页修复）** → [GitHub Releases](https://github.com/nekibud/OC-editor/releases/latest)
 
-- [便携版 OC-editor-0.22.5-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.22.5/OC-editor-0.22.5-portable-win64.zip) ← **推荐：解压即用，不需要安装**
-- [安装程序 OC-editor-0.22.5-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.22.5/OC-editor-0.22.5-Setup.exe)
-- [微软商店 MSIX 包 OC-editor-0.22.5.msix](https://github.com/nekibud/OC-editor/releases/download/v0.22.5/OC-editor-0.22.5.msix)（Microsoft Store 提交用）
+- [便携版 OC-editor-0.22.6-portable-win64.zip](https://github.com/nekibud/OC-editor/releases/download/v0.22.6/OC-editor-0.22.6-portable-win64.zip) ← **推荐：解压即用，不需要安装**
+- [安装程序 OC-editor-0.22.6-Setup.exe](https://github.com/nekibud/OC-editor/releases/download/v0.22.6/OC-editor-0.22.6-Setup.exe)
+- [微软商店 MSIX 包 OC-editor-0.22.6.msix](https://github.com/nekibud/OC-editor/releases/download/v0.22.6/OC-editor-0.22.6.msix)（Microsoft Store 提交用）
 
 **GitHub Packages**：`OCEditor` NuGet 包（内含 MSIX + 便携版 ZIP）  
 https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 > GitHub Packages 不能直接托管 `.msix`，所以用 NuGet 包承载安装文件；普通用户优先用上面的 Release 下载。
 
-> **0.22.5 新增**：
+> **0.22.6 新增**：
 > 1. 全界面中英双语：顶栏「EN / 中文」即时切换，设置里也可切换；菜单、按钮、表单、
 >    设置、提示、对话框、地图/关系图/小说/时间线等静态文案均提供英文，语言选择会记住。
 >    英文版角色改名输入期间会暂停翻译层改写 DOM，避免受控输入卡死。
@@ -78,7 +78,7 @@ https://github.com/nekibud/OC-editor/pkgs/nuget/OCEditor
 
 本地优先的原创角色（OC）与世界观创作工作台。
 
-当前版本：**v0.22.5 · local-first**
+当前版本：**v0.22.6 · local-first**
 
 本仓库在原有角色 / 事件 / 国家 / 词条 / 时间线 / 关系图谱骨架上增量扩展，
 新增了**多世界观隔离**、**程序化世界地图生成器**与**可折叠树形表格**。运行时完全离线：无账号、无云同步、
