@@ -19,8 +19,8 @@
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <DebugType>None</DebugType>
     <DebugSymbols>false</DebugSymbols>
-    <Version>0.22.6</Version>
-    <FileVersion>0.22.6.0</FileVersion>
+    <Version>0.22.7</Version>
+    <FileVersion>0.22.7.0</FileVersion>
     <AssemblyTitle>OC editor 安装程序</AssemblyTitle>
     <Product>OC editor</Product>
     <Company>OC editor</Company>

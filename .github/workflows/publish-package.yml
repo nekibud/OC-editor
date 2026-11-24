@@ -24,8 +24,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p artifacts
-          gh release download v0.22.6 --pattern "OC-editor-0.22.6.msix" --dir artifacts
-          gh release download v0.22.6 --pattern "OC-editor-0.22.6-portable-win64.zip" --dir artifacts
+          gh release download v0.22.7 --pattern "OC-editor-0.22.7.msix" --dir artifacts
+          gh release download v0.22.7 --pattern "OC-editor-0.22.7-portable-win64.zip" --dir artifacts
 
       - name: Pack NuGet package
         run: dotnet pack packaging/OCEditor.Package/OCEditor.Package.csproj -c Release -o package-output

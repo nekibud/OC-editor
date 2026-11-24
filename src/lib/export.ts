@@ -3,6 +3,8 @@ import { filterByActiveWorld } from '@/lib/world-scope'
 import { createZip, downloadBlob } from '@/lib/zip'
 import { embedImagesDeep } from '@/lib/embed-assets'
 import { blobToDataUrl } from '@/lib/blob-data'
+import { novelDb } from '@/features/novel/store'
+import { readAllCustomSections } from '@/features/custom-sections/store'
 
 export interface ExportPayload {
   version: 2
@@ -19,6 +21,9 @@ export interface ExportPayload {
     countries: unknown[]
     worldEntries: unknown[]
     tags: unknown[]
+    periods?: unknown[]
+    novels?: unknown[]
+    customSections?: unknown[]
     maps: unknown[]
     /** 世界观列表；旧备份没有该字段时全部内容归入默认世界观。 */
     worlds?: unknown[]
@@ -26,12 +31,15 @@ export interface ExportPayload {
 }
 
 export async function exportAllData(): Promise<ExportPayload> {
-  const [characters, events, countries, worldEntries, tags, maps, worlds] = await Promise.all([
+  const customSections = readAllCustomSections()
+  const [characters, events, countries, worldEntries, tags, periods, novels, maps, worlds] = await Promise.all([
     db.characters.filter((c) => !c.deleted).toArray(),
     db.events.filter((e) => !e.deleted).toArray(),
     db.countries.filter((c) => !c.deleted).toArray(),
     db.worldEntries.filter((w) => !w.deleted).toArray(),
     db.tags.toArray(),
+    db.periods.filter((p) => !p.deleted).toArray(),
+    novelDb.novels.toArray(),
     db.maps.filter((m) => !m.deleted).toArray(),
     db.worlds.filter((w) => !w.deleted).toArray(),
   ])
@@ -49,6 +57,9 @@ export async function exportAllData(): Promise<ExportPayload> {
     countries,
     worldEntries,
     tags,
+    periods,
+    novels,
+    customSections,
     maps: mapsWithImages,
     worlds,
   })
@@ -60,7 +71,7 @@ export async function exportAllData(): Promise<ExportPayload> {
       app: 'OC editor',
       format: 'oc-editor-backup',
       offline: true,
-      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'maps', 'images'],
+      includes: ['worlds', 'characters', 'events', 'countries', 'worldEntries', 'tags', 'periods', 'novels', 'customSections', 'maps', 'images'],
     },
     data: {
       characters: embedded.characters,
@@ -68,6 +79,9 @@ export async function exportAllData(): Promise<ExportPayload> {
       countries: embedded.countries,
       worldEntries: embedded.worldEntries,
       tags: embedded.tags,
+      periods: embedded.periods,
+      novels: embedded.novels,
+      customSections: embedded.customSections,
       maps: embedded.maps,
       worlds: embedded.worlds,
     },
@@ -88,6 +102,9 @@ export async function exportAllDataZip(): Promise<{ name: string; size: number }
       countries: data.data.countries.length,
       worldEntries: data.data.worldEntries.length,
       tags: data.data.tags.length,
+      periods: data.data.periods?.length ?? 0,
+      novels: data.data.novels?.length ?? 0,
+      customSections: data.data.customSections?.length ?? 0,
       maps: data.data.maps.length,
     },
     note: '地图图层不直接存入备份；使用 seed + params 可确定性重建完全相同的图层。',

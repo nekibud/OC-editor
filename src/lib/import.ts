@@ -2,6 +2,8 @@ import { db } from '@/lib/db'
 import { getActiveWorldId, getLegacyWorldId } from '@/lib/world-scope'
 import { syncRelationsFromEntities } from '@/features/relations/services'
 import { dataUrlToBlob } from '@/lib/blob-data'
+import { novelDb } from '@/features/novel/store'
+import { mergeCustomSections, replaceAllCustomSections, type CustomSection } from '@/features/custom-sections/store'
 import type { QueryClient } from '@tanstack/react-query'
 import type { Table } from 'dexie'
 
@@ -14,6 +16,9 @@ interface ImportPayload {
     countries: unknown[]
     worldEntries: unknown[]
     tags: unknown[]
+    periods?: unknown[]
+    novels?: unknown[]
+    customSections?: unknown[]
     maps?: unknown[]
     worlds?: unknown[]
   }
@@ -25,6 +30,8 @@ export interface ImportSummary {
   countries: number
   worldEntries: number
   tags: number
+  periods: number
+  novels: number
   maps: number
 }
 
@@ -37,7 +44,7 @@ export interface ImportResult {
 }
 
 const TABLE_CONFIG: Array<{
-  key: 'characters' | 'events' | 'countries' | 'worldEntries' | 'tags' | 'maps'
+  key: 'characters' | 'events' | 'countries' | 'worldEntries' | 'tags' | 'periods' | 'maps'
   table: Table<Record<string, unknown>, number>
   nameField: string
 }> = [
@@ -46,6 +53,7 @@ const TABLE_CONFIG: Array<{
   { key: 'countries', table: db.countries as unknown as Table<Record<string, unknown>, number>, nameField: 'name' },
   { key: 'worldEntries', table: db.worldEntries as unknown as Table<Record<string, unknown>, number>, nameField: 'title' },
   { key: 'tags', table: db.tags as unknown as Table<Record<string, unknown>, number>, nameField: 'name' },
+  { key: 'periods', table: db.periods as unknown as Table<Record<string, unknown>, number>, nameField: 'name' },
   { key: 'maps', table: db.maps as unknown as Table<Record<string, unknown>, number>, nameField: 'name' },
 ]
 
@@ -137,6 +145,8 @@ export function validateImportData(json: unknown): ImportSummary {
     countries: (data.countries as unknown[]).length,
     worldEntries: (data.worldEntries as unknown[]).length,
     tags: (data.tags as unknown[]).length,
+    periods: Array.isArray(data.periods) ? data.periods.length : 0,
+    novels: Array.isArray(data.novels) ? data.novels.length : 0,
     maps: Array.isArray(data.maps) ? data.maps.length : 0,
   }
 }
@@ -271,6 +281,9 @@ export async function importData(
   const sanitized = stripRemoteUrls(json) as ImportPayload
   const records = sanitized.data
   const maps = Array.isArray(records.maps) ? records.maps : []
+  const periods = Array.isArray(records.periods) ? records.periods : []
+  const novels = Array.isArray(records.novels) ? records.novels : []
+  const customSections = Array.isArray(records.customSections) ? records.customSections : []
   const worlds = Array.isArray(records.worlds) ? records.worlds : []
   const worldMap = await resolveImportedWorlds(worlds)
   const fallbackWorldId = getActiveWorldId() ?? getLegacyWorldId() ?? undefined
@@ -290,6 +303,9 @@ export async function importData(
     return { ...row, imageBlob: restore(row.imageBlob), paintBlob: restore(row.paintBlob) }
   })
   const mapRecords = withWorld(restoredMaps)
+  const periodRecords = withWorld(periods)
+  const novelRecords = withWorld(novels)
+  const customSectionRecords = withWorld(customSections) as CustomSection[]
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('oc-worlds-changed'))
@@ -301,7 +317,10 @@ export async function importData(
     await db.countries.clear()
     await db.worldEntries.clear()
     await db.tags.clear()
+    await db.periods.clear()
     await db.maps.clear()
+    await novelDb.novels.clear()
+    replaceAllCustomSections(customSectionRecords)
     // 关系表也必须清空；否则旧关系会指向已被清掉的角色/国家。
     await db.relations.clear()
 
@@ -311,7 +330,9 @@ export async function importData(
       countries.length > 0 ? db.countries.bulkAdd(countries as never[]) : Promise.resolve(),
       worldEntries.length > 0 ? db.worldEntries.bulkAdd(worldEntries as never[]) : Promise.resolve(),
       records.tags.length > 0 ? db.tags.bulkAdd(records.tags as never[]) : Promise.resolve(),
+      periodRecords.length > 0 ? db.periods.bulkAdd(periodRecords as never[]) : Promise.resolve(),
       mapRecords.length > 0 ? db.maps.bulkAdd(mapRecords as never[]) : Promise.resolve(),
+      novelRecords.length > 0 ? novelDb.novels.bulkAdd(novelRecords as never[]) : Promise.resolve(),
     ])
 
     // 备份里存的是实体上的关系投影，不是 relations 表；导入后重建一次，
@@ -327,6 +348,8 @@ export async function importData(
       countries.length +
       worldEntries.length +
       records.tags.length +
+      periodRecords.length +
+      novelRecords.length +
       mapRecords.length
     queryClient?.invalidateQueries()
     return { added: total, skipped: 0, overwritten: 0 }
@@ -347,11 +370,20 @@ export async function importData(
             ? events
             : config.key === 'countries'
               ? countries
-              : worldEntries) as unknown[]
+              : config.key === 'periods'
+                ? periodRecords
+                : worldEntries) as unknown[]
     const result = await processTableMerge(config.table, items, strategy, config.nameField)
     totalAdded += result.added
     totalSkipped += result.skipped
     totalOverwritten += result.overwritten
+  }
+
+  if (novelRecords.length > 0) {
+    await novelDb.novels.bulkPut(novelRecords as never[])
+  }
+  if (customSectionRecords.length > 0) {
+    mergeCustomSections(customSectionRecords)
   }
 
   // 与 replace 分支保持一致：把合并后的实体投影同步成关系表。

@@ -12,7 +12,7 @@ import {
 } from '@/lib/world-scope'
 
 // 数据库名沿用历史值：改名会变成新的空库，旧小说会“消失”。
-const novelDb = new Dexie('OCStudioNovels') as Dexie & {
+export const novelDb = new Dexie('OCStudioNovels') as Dexie & {
   novels: Table<Novel, number>
 }
 

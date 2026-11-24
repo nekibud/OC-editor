@@ -733,6 +733,21 @@ export function readVisibleCustomSections(): CustomSection[] {
   return loadVisibleSections()
 }
 
+export function readAllCustomSections(): CustomSection[] {
+  return loadCustomSections()
+}
+
+export function replaceAllCustomSections(sections: CustomSection[]): void {
+  saveCustomSections(sections)
+}
+
+export function mergeCustomSections(sections: CustomSection[]): void {
+  const current = loadCustomSections()
+  const byId = new Map(current.map((section) => [section.id, section]))
+  for (const section of sections) byId.set(section.id, section)
+  saveCustomSections([...byId.values()])
+}
+
 export type CustomSectionImportOutcome = 'added' | 'overwritten' | 'skipped'
 
 /**
