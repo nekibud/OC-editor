@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { Search, RefreshCw, ChevronRight, ChevronLeft, Menu, ExternalLink } from 'lucide-react'
+import { Search, RefreshCw, ChevronRight, ChevronLeft, Menu, ExternalLink, Trash2 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { resolveImageUrl, getDefaultImage } from '@/lib/image-service'
 import { FullscreenViewer } from './FullscreenViewer'
-import { useAlbumData, type AlbumEntry } from './useAlbumData'
+import { removeAlbumEntry, useAlbumData, type AlbumEntry } from './useAlbumData'
+import { AppConfirm } from './AppConfirm'
 import { useDevice } from '@/lib/use-device'
 import { useMobilePageHeader } from '@/components/layout/MobilePageHeaderContext'
 import { useMobileNavigation } from '@/components/layout/MobileNavigationContext'
@@ -82,12 +83,14 @@ function AlbumCard({
   onNavigate,
   onLongPress,
   onViewImage,
+  onDelete,
 }: {
   entry: AlbumEntry
   isMobile: boolean
   onNavigate?: (id: number, type: string) => void
   onLongPress?: () => void
   onViewImage: () => void
+  onDelete: () => void
 }) {
   const longPress = useLongPress({
     onLongPress: onLongPress ?? (() => {}),
@@ -102,6 +105,18 @@ function AlbumCard({
         className="touch-feedback aspect-square w-full cursor-pointer rounded-md border border-line object-cover transition-shadow hover:shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
         onClick={onViewImage}
       />
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onDelete()
+        }}
+        className="absolute right-1 top-1 rounded-md bg-black/50 p-1 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+        title="从相册移除"
+        aria-label="从相册移除"
+      >
+        <Trash2 size={12} strokeWidth={2} />
+      </button>
       <div className="mt-1 truncate text-xs text-ink-faint">
         {entry.sourceName}
         {onNavigate && !isMobile ? (
@@ -130,6 +145,7 @@ export function GlobalAlbum({ onNavigate }: GlobalAlbumProps) {
   const [actionSheet, setActionSheet] = useState<{ open: boolean; title: string; actions: ActionItem[] }>({
     open: false, title: '', actions: [],
   })
+  const [pendingDelete, setPendingDelete] = useState<AlbumEntry | null>(null)
   const { isMobile } = useDevice()
   const { setConfig } = useMobilePageHeader()
   const { section } = useMobileNavigation()
@@ -162,6 +178,7 @@ export function GlobalAlbum({ onNavigate }: GlobalAlbumProps) {
       title: entry.sourceName,
       actions: [
         { id: 'navigate', label: '跳转', icon: <ExternalLink size={20} strokeWidth={2} />, onPress: () => onNavigate?.(entry.sourceId, entry.sourceType) },
+        { id: 'delete', label: '从相册移除', icon: <Trash2 size={20} strokeWidth={2} />, destructive: true, onPress: () => setPendingDelete(entry) },
       ],
     })
   }, [onNavigate])
@@ -367,6 +384,7 @@ export function GlobalAlbum({ onNavigate }: GlobalAlbumProps) {
                   onNavigate={onNavigate}
                   onLongPress={onNavigate ? () => openActionSheet(entry) : undefined}
                   onViewImage={() => setViewerIndex(idx)}
+                  onDelete={() => setPendingDelete(entry)}
                 />
               ))}
             </div>
@@ -384,6 +402,20 @@ export function GlobalAlbum({ onNavigate }: GlobalAlbumProps) {
         onClose={() => setActionSheet((prev) => ({ ...prev, open: false }))}
         title={actionSheet.title}
         actions={actionSheet.actions}
+      />
+
+      <AppConfirm
+        open={pendingDelete !== null}
+        title="从相册移除这张图片？"
+        description="只会移除这个条目里的图片引用，不会删除其他条目仍在使用的文件。"
+        confirmLabel="移除"
+        danger
+        onConfirm={() => {
+          const entry = pendingDelete
+          setPendingDelete(null)
+          if (entry) void removeAlbumEntry(entry).then(() => refresh())
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
     </div>
   )

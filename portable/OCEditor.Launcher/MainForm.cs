@@ -74,7 +74,7 @@ internal sealed class MainForm : Form
         return Path.Combine(localAppData, "OC editor", "WebView2");
     }
 
-    private static void CopyDirectory(string source, string target)
+    private static void CopyDirectory(string source, string target, bool overwrite)
     {
         var sourceRoot = new DirectoryInfo(source).FullName;
         Directory.CreateDirectory(target);
@@ -86,16 +86,45 @@ internal sealed class MainForm : Form
         {
             var destination = file.Replace(sourceRoot, target);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(file, destination, overwrite: false);
+            File.Copy(file, destination, overwrite);
         }
+    }
+
+    /// <summary>
+    /// 只看 IndexedDB 的实际字节数，不能只看目录是否存在。
+    /// 首次启动会创建一个空的 WebView2 配置目录；旧逻辑因此误判“已有数据”，
+    /// 把 %LOCALAPPDATA%\OC Studio 或旧 OC editor 里的真实数据跳过，用户就看到空库。
+    /// </summary>
+    private static long IndexedDbBytes(string folder)
+    {
+        try
+        {
+            var indexedDb = Path.Combine(folder, "EBWebView", "Default", "IndexedDB");
+            if (!Directory.Exists(indexedDb)) return 0;
+            long total = 0;
+            foreach (var file in Directory.EnumerateFiles(indexedDb, "*", SearchOption.AllDirectories))
+            {
+                try { total += new FileInfo(file).Length; } catch { /* skip locked file */ }
+            }
+            return total;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static bool HasUsableData(string folder)
+    {
+        // 空的 WebView2 profile 通常只有几 KB 的 leveldb 文件；真实库远大于此。
+        return IndexedDbBytes(folder) >= 32 * 1024;
     }
 
     private static void MigrateLegacyDataIfNeeded(string userDataFolder)
     {
         try
         {
-            if (Directory.Exists(userDataFolder) && Directory.EnumerateFileSystemEntries(userDataFolder).Any()) return;
-
+            var targetBytes = IndexedDbBytes(userDataFolder);
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var sources = new List<string>
             {
@@ -105,24 +134,76 @@ internal sealed class MainForm : Form
             var familyName = GetPackageFamilyName();
             if (!string.IsNullOrEmpty(familyName))
             {
-                // 旧版 MSIX 可能被文件虚拟化写到这里，也一并迁移。
+                // 旧版 MSIX 可能被文件虚拟化写到这些位置，也一并迁移。
+                sources.Add(Path.Combine(localAppData, "Packages", familyName, "LocalState", "OC Studio", "WebView2"));
                 sources.Add(Path.Combine(localAppData, "Packages", familyName, "LocalCache", "Local", "OC editor", "WebView2"));
+                sources.Add(Path.Combine(localAppData, "Packages", familyName, "LocalCache", "Local", "OC Studio", "WebView2"));
             }
 
+            string? bestSource = null;
+            long bestBytes = 0;
             foreach (var source in sources)
             {
                 if (!Directory.Exists(source)) continue;
                 if (string.Equals(Path.GetFullPath(source), Path.GetFullPath(userDataFolder), StringComparison.OrdinalIgnoreCase)) continue;
+                var bytes = IndexedDbBytes(source);
+                LauncherLog.Write($"legacy candidate: {source} ({bytes} bytes)");
+                if (bytes > bestBytes)
+                {
+                    bestBytes = bytes;
+                    bestSource = source;
+                }
+            }
+
+            if (bestSource is null || bestBytes < 64 * 1024)
+            {
+                LauncherLog.Write($"no usable legacy WebView2 data found (target {targetBytes} bytes)");
+                return;
+            }
+
+            // 目标里只有空壳（几十 KB 的 leveldb）时迁移；即使目标已经
+            // 被首次启动创建过一点 schema，只要远小于旧库也恢复旧库。
+            // 目标本身是完整库时绝不覆盖。
+            if (targetBytes >= 256 * 1024 && targetBytes * 4 >= bestBytes)
+            {
+                LauncherLog.Write($"user data already usable: target {targetBytes} bytes, legacy {bestBytes} bytes");
+                return;
+            }
+
+            var backup = $"{userDataFolder}.before-migration-{DateTime.Now:yyyyMMdd-HHmmss}";
+            try
+            {
+                if (Directory.Exists(userDataFolder))
+                {
+                    Directory.Move(userDataFolder, backup);
+                    LauncherLog.Write($"empty/broken profile backed up to {backup}");
+                }
+                LauncherLog.Write($"migrating data from {bestSource} to {userDataFolder} ({bestBytes} bytes)");
+                CopyDirectory(bestSource, userDataFolder, overwrite: true);
+                if (!HasUsableData(userDataFolder))
+                {
+                    throw new IOException("migration produced no usable IndexedDB data");
+                }
+                LauncherLog.Write("data migration finished");
+            }
+            catch (Exception error)
+            {
+                LauncherLog.Write($"data migration failed: {error}");
                 try
                 {
-                    LauncherLog.Write($"migrating data from {source} to {userDataFolder}");
-                    CopyDirectory(source, userDataFolder);
-                    LauncherLog.Write("data migration finished");
-                    return;
+                    if (Directory.Exists(userDataFolder) && !HasUsableData(userDataFolder))
+                    {
+                        Directory.Delete(userDataFolder, recursive: true);
+                    }
+                    if (!Directory.Exists(userDataFolder) && Directory.Exists(backup))
+                    {
+                        Directory.Move(backup, userDataFolder);
+                        LauncherLog.Write("restored pre-migration profile after failure");
+                    }
                 }
-                catch (Exception error)
+                catch (Exception restoreError)
                 {
-                    LauncherLog.Write($"data migration from {source} failed: {error}");
+                    LauncherLog.Write($"restore after failed migration also failed: {restoreError}");
                 }
             }
         }

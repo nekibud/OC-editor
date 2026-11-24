@@ -1350,4 +1350,8 @@ export const EN: Record<string, string> = {
   "OC editor 是在原始开源项目基础上继续开发的版本。上方已按「OC editor 作者信息」和「开源作者信息」分开标注。": "OC editor is developed on top of the original open-source project. The sections above clearly separate the OC editor author from the open-source author.",
   "开源来源": "Open-source source",
   "本软件维护者": "Maintainer of this app",
+  "从相册移除": "Remove from album",
+  "从相册移除这张图片？": "Remove this image from the album?",
+  "只会移除这个条目里的图片引用，不会删除其他条目仍在使用的文件。": "This only removes the image reference from this entry; files still used by other entries are kept.",
+  "移除": "Remove",
 }

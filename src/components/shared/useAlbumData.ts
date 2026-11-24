@@ -76,5 +76,52 @@ export function useAlbumData() {
     void load().then(() => setLoading(false))
   }, [load])
 
+  useEffect(() => {
+    const reload = (): void => {
+      void load()
+    }
+    window.addEventListener('data-updated', reload)
+    window.addEventListener('oc-world-changed', reload)
+    window.addEventListener('oc-albums-changed', reload)
+    return () => {
+      window.removeEventListener('data-updated', reload)
+      window.removeEventListener('oc-world-changed', reload)
+      window.removeEventListener('oc-albums-changed', reload)
+    }
+  }, [load])
+
   return { entries, loading, refresh: load }
+}
+
+/** 从相册移除一张图片引用；不删除其他条目仍在使用的文件。 */
+export async function removeAlbumEntry(entry: AlbumEntry): Promise<void> {
+  if (entry.sourceType === 'character') {
+    const character = await db.characters.get(entry.sourceId)
+    if (!character) return
+    if (entry.category === 'avatar') await db.characters.update(character.id!, { avatarUrl: '' })
+    else if (entry.category === 'qAvatar') await db.characters.update(character.id!, { qAvatarUrl: '' })
+    else if (entry.category === 'header') await db.characters.update(character.id!, { headerUrl: '' })
+    else if (entry.category === 'fullbody') {
+      const avatars = (character.avatars ?? []).filter((item) => (typeof item === 'string' ? item : item.url) !== entry.url)
+      await db.characters.update(character.id!, { avatars })
+    } else if (entry.category === 'gallery') {
+      const gallery = (character.gallery ?? []).filter((item) => (typeof item === 'string' ? item : item.url) !== entry.url)
+      await db.characters.update(character.id!, { gallery })
+    }
+  } else if (entry.sourceType === 'event') {
+    const event = await db.events.get(entry.sourceId)
+    if (!event) return
+    if (entry.category === 'header') await db.events.update(event.id!, { headerUrl: '' })
+    else if (entry.category === 'gallery') {
+      const images = (event.images ?? []).filter((item) => (typeof item === 'string' ? item : item.url) !== entry.url)
+      await db.events.update(event.id!, { images })
+    }
+  } else if (entry.sourceType === 'country') {
+    const country = await db.countries.get(entry.sourceId)
+    if (!country) return
+    if (entry.category === 'flag') await db.countries.update(country.id!, { flagUrl: '' })
+    else if (entry.category === 'header') await db.countries.update(country.id!, { headerUrl: '' })
+  }
+  window.dispatchEvent(new Event('data-updated'))
+  window.dispatchEvent(new Event('oc-albums-changed'))
 }
